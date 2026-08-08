@@ -1,0 +1,7 @@
+export type QRRecord = { id: string; qrToken: string; productName: string; productId: string; batchNumber: string; status: 'Active' | 'Deactivated'; scanCount: number; createdDate: string; manufacturingDate: string; expiryDate: string; lastScan: string | null }
+export const demoQRs: QRRecord[] = [
+  { id: 'qr-001', qrToken: 'MN-CLASSIC-RAGI-00001', productId: 'classic-ragi', productName: 'Classic Ragi Flour', batchNumber: 'MN-RAGI-001-B1', status: 'Active', scanCount: 248, createdDate: '07 Aug 2026', manufacturingDate: '15 Jul 2026', expiryDate: '15 Jul 2027', lastScan: 'Today, 10:42 AM' },
+  { id: 'qr-002', qrToken: 'MN-CLASSIC-RAGI-00002', productId: 'classic-ragi', productName: 'Classic Ragi Flour', batchNumber: 'MN-RAGI-001-B1', status: 'Active', scanCount: 184, createdDate: '07 Aug 2026', manufacturingDate: '15 Jul 2026', expiryDate: '15 Jul 2027', lastScan: 'Yesterday, 4:18 PM' },
+  { id: 'qr-003', qrToken: 'MN-ORGANIC-BAJRA-00001', productId: 'organic-bajra', productName: 'Organic Bajra Atta', batchNumber: 'MN-BAJRA-002-B1', status: 'Deactivated', scanCount: 96, createdDate: '02 Aug 2026', manufacturingDate: '10 Jul 2026', expiryDate: '10 Jul 2027', lastScan: '02 Aug 2026' },
+  { id: 'qr-004', qrToken: 'MN-ORGANIC-BAJRA-00002', productId: 'organic-bajra', productName: 'Organic Bajra Atta', batchNumber: 'MN-BAJRA-002-B1', status: 'Active', scanCount: 72, createdDate: '02 Aug 2026', manufacturingDate: '10 Jul 2026', expiryDate: '10 Jul 2027', lastScan: 'Today, 9:06 AM' },
+]

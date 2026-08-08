@@ -1,0 +1,12 @@
+import { Router } from 'express'
+import { qrCodeController } from '../controllers/qrcode-controller.js'
+
+export const qrCodeRoutes = Router()
+qrCodeRoutes.get('/', qrCodeController.list)
+qrCodeRoutes.get('/download', qrCodeController.download)
+qrCodeRoutes.get('/print', qrCodeController.print)
+qrCodeRoutes.get('/:id', qrCodeController.get)
+qrCodeRoutes.post('/generate', qrCodeController.generate)
+qrCodeRoutes.post('/bulk', qrCodeController.bulk)
+qrCodeRoutes.delete('/:id', qrCodeController.remove)
+qrCodeRoutes.patch('/:id/status', qrCodeController.status)

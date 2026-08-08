@@ -1,0 +1,18 @@
+import { useEffect, useMemo, useState } from 'react'
+import { HelpCircleIcon, HeartIcon, MessageSquareIcon, MessageSquareWarningIcon } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import { EmptyState } from '@/components/common/empty-state'
+import { PageContainer, PageDescription, PageHeader, PageHeading, PageLayout, PageTitle } from '@/components/layout/page-layout'
+import { API_URL } from '@/context/auth-context'
+
+type Message = { id: string; rating: number | null; message: string | null; status: string; submittedAt: string; productName: string | null; type: string }
+
+function MessagesPage() {
+  const [items, setItems] = useState<Message[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('')
+  useEffect(() => { let active = true; fetch(`${API_URL}/feedback?limit=100`, { credentials: 'include' }).then(async (response) => { if (!response.ok) throw new Error(response.status === 401 ? 'Your session has expired. Please sign in again.' : 'Unable to load messages.'); return response.json() as Promise<{ items: Message[] }> }).then((body) => { if (active) setItems(body.items) }).catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Unable to load messages.') }).finally(() => { if (active) setLoading(false) }); return () => { active = false } }, [])
+  const counts = useMemo(() => ({ total: items.length, feedback: items.filter((item) => item.type === 'feedback').length, questions: items.filter((item) => item.type === 'question').length, compliments: items.filter((item) => item.type === 'compliment').length, complaints: items.filter((item) => item.type === 'complaint').length }), [items])
+  const metrics = [['Total messages', counts.total, MessageSquareIcon], ['Feedback', counts.feedback, MessageSquareIcon], ['Questions', counts.questions, HelpCircleIcon], ['Compliments', counts.compliments, HeartIcon], ['Complaints', counts.complaints, MessageSquareWarningIcon]] as const
+  return <PageLayout className="bg-[#F7F8FA]"><PageContainer><div className="space-y-6 pb-10"><PageHeader><PageHeading><PageTitle>Messages</PageTitle><PageDescription>Review and manage customer conversations across your workspace.</PageDescription></PageHeading></PageHeader><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">{metrics.map(([label, value, Icon]) => <Card key={label}><CardContent className="p-5"><Icon className="size-5 text-primary" /><p className="mt-4 text-xs text-muted-foreground">{label}</p><p className="mt-1 font-heading text-2xl font-bold">{value}</p></CardContent></Card>)}</div>{loading ? <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Loading messages...</CardContent></Card> : error ? <Card><CardContent className="p-8 text-center text-sm text-destructive">{error}</CardContent></Card> : items.length === 0 ? <EmptyState title="No messages yet" description="Customer messages will appear here once QR codes are scanned and customers get in touch." icon={MessageSquareIcon} /> : <Card><CardContent className="divide-y p-0">{items.map((item) => <div key={item.id} className="flex flex-col gap-2 p-5 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-sm font-semibold">{item.message || 'Customer message'}</p><p className="mt-1 text-xs text-muted-foreground">{item.productName ? `${item.productName} · ` : ''}{item.type} · {new Date(item.submittedAt).toLocaleString('en-IN')}</p></div><span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium capitalize">{item.status.replace('_', ' ')}</span></div>)}</CardContent></Card>}</div></PageContainer></PageLayout>
+}
+
+export default MessagesPage
