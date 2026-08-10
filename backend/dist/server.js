@@ -10,3 +10,5 @@ const shutdown = (signal) => {
 };
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
+// Keep process active in non-interactive background runner
+setInterval(() => { }, 60000);

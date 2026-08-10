@@ -4,7 +4,9 @@ import cors from 'cors'
 import express from 'express'
 import helmet from 'helmet'
 import morgan from 'morgan'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { env } from './config/env.js'
 import { errorHandler } from './middleware/error-handler.js'
@@ -18,6 +20,9 @@ import { healthRoute } from './routes/health-route.js'
 import { feedbackRoutes } from './routes/feedback-routes.js'
 
 export const app = express()
+const currentDir = path.dirname(fileURLToPath(import.meta.url))
+const frontendDistDir = path.resolve(currentDir, '..', '..', 'frontend', 'dist')
+const hasFrontendBuild = existsSync(frontendDistDir)
 
 app.disable('x-powered-by')
 app.use(helmet())
@@ -36,5 +41,13 @@ app.use('/products', productRoutes)
 app.use('/qrcodes', qrCodeRoutes)
 app.use('/scan', scanRoutes)
 app.use('/feedback', feedbackRoutes)
+
+if (hasFrontendBuild) {
+  app.use(express.static(frontendDistDir))
+  app.get(/^(?!\/(?:auth|health|products|qrcodes|scan|feedback|uploads)\b).*/, (_request, response) => {
+    response.sendFile(path.join(frontendDistDir, 'index.html'))
+  })
+}
+
 app.use(notFound)
 app.use(errorHandler)
