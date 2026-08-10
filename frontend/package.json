@@ -25,6 +25,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^13.0.0",
     "lucide-react": "^1.29.0",
+    "milletsnow-qr-feedback-system": "file:..",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-hook-form": "^7.84.0",

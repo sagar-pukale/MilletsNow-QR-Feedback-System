@@ -1,11 +1,28 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build outputs
+dist
+**/dist
+build
+**/build
+frontend/*.tsbuildinfo
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
 backend/.env
 backend/.env.*
 !backend/.env.example
 frontend/.env
 frontend/.env.*
 !frontend/.env.example
-.env
-.env.*
-!.env.example
+
+# Logs & temp files
+*.log
 tmp-backend-*.log
-frontend/*.tsbuildinfo
+.temp
+.DS_Store
+Thumbs.db
