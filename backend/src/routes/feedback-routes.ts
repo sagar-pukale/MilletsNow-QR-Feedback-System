@@ -1,9 +1,19 @@
 import { Router } from 'express'
+import { Prisma } from '@prisma/client'
 import { prisma } from '../config/prisma.js'
 import { requireAuth } from '../middleware/auth.js'
 import { feedbackSchema } from '../validators/feedback-validator.js'
 
 export const feedbackRoutes = Router()
+
+type FeedbackWithProduct = Prisma.FeedbackGetPayload<{
+  include: {
+    product: { select: { name: true } }
+    question: { select: { id: true } }
+    compliment: { select: { id: true } }
+    complaint: { select: { id: true } }
+  }
+}>
 
 feedbackRoutes.post('/', async (request, response, next) => {
   try {
@@ -59,7 +69,7 @@ feedbackRoutes.get('/', requireAuth, async (request, response, next) => {
     ])
 
     response.json({
-      items: items.map((f) => ({
+      items: items.map((f: FeedbackWithProduct) => ({
         id: f.id,
         rating: f.rating,
         message: f.message,

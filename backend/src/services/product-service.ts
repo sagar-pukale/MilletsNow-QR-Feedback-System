@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { productRepository } from '../repositories/product-repository.js'
 import { productCreateSchema, productIdSchema, productUpdateSchema } from '../validators/product-validator.js'
 import { prisma } from '../config/prisma.js'
@@ -26,7 +27,7 @@ export const productService = {
     const productId = productIdSchema.parse(id)
     const data = productUpdateSchema.parse(input)
     const { manufacturingDate, expiryDate, batchNumber, quantity, categoryId, categoryName: _categoryName, ...product } = data
-    return prisma.$transaction(async (transaction) => {
+    return prisma.$transaction(async (transaction: Prisma.TransactionClient) => {
       await transaction.product.update({ where: { id: productId }, data: { ...product, ...(categoryId !== undefined ? { categoryId } : {}) } })
       if (batchNumber || manufacturingDate || expiryDate || quantity !== undefined) {
         const existing = await transaction.productBatch.findFirst({ where: { productId }, orderBy: { createdAt: 'desc' } })

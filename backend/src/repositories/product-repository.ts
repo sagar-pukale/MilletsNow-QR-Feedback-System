@@ -1,8 +1,9 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from '../config/prisma.js'
 
 export const productRepository = {
   list({ skip, take, search, categoryId, isActive }: { skip: number; take: number; search?: string; categoryId?: string; isActive?: boolean }) {
-    const where = {
+    const where: Prisma.ProductWhereInput = {
       ...(search ? { OR: [{ name: { contains: search, mode: 'insensitive' as const } }, { sku: { contains: search, mode: 'insensitive' as const } }] } : {}),
       ...(categoryId ? { categoryId } : {}),
       ...(isActive === undefined ? {} : { isActive }),
@@ -15,10 +16,10 @@ export const productRepository = {
   findById(id: string) {
     return prisma.product.findUnique({ where: { id }, include: { category: true, batches: true, _count: { select: { qrCodes: true } } } })
   },
-  create(data: Parameters<typeof prisma.product.create>[0]['data']) {
+  create(data: Prisma.ProductCreateInput) {
     return prisma.product.create({ data, include: { category: true, batches: true, _count: { select: { qrCodes: true } } } })
   },
-  update(id: string, data: Parameters<typeof prisma.product.update>[0]['data']) {
+  update(id: string, data: Prisma.ProductUpdateInput) {
     return prisma.product.update({ where: { id }, data, include: { category: true, batches: true, _count: { select: { qrCodes: true } } } })
   },
   remove(id: string) {
