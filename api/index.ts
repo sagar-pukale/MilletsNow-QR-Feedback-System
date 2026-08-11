@@ -5,7 +5,7 @@ type AppHandler = (req: VercelRequest, res: VercelResponse) => unknown
 let appPromise: Promise<AppHandler> | undefined
 
 function loadApp() {
-  appPromise ??= import('../backend/dist/app.js').then(({ app }) => app as AppHandler)
+  appPromise ??= import('../backend/src/app.js').then(({ app }) => app as AppHandler)
   return appPromise
 }
 
