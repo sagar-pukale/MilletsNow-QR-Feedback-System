@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "outDir": "./vercel-dist"
+  },
+  "exclude": [
+    "src/prisma/seed.ts",
+    "src/scripts/**/*.ts",
+    "src/server.ts"
+  ]
+}

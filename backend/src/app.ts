@@ -6,7 +6,6 @@ import helmet from 'helmet'
 import morgan from 'morgan'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import { env } from './config/env.js'
 import { errorHandler } from './middleware/error-handler.js'
@@ -20,8 +19,9 @@ import { healthRoute } from './routes/health-route.js'
 import { feedbackRoutes } from './routes/feedback-routes.js'
 
 export const app = express()
-const currentDir = path.dirname(fileURLToPath(import.meta.url))
-const frontendDistDir = path.resolve(currentDir, '..', '..', 'frontend', 'dist')
+const workspaceRoot = existsSync(path.resolve(process.cwd(), 'frontend')) ? process.cwd() : path.resolve(process.cwd(), '..')
+const backendRoot = existsSync(path.resolve(process.cwd(), 'src')) ? process.cwd() : path.resolve(workspaceRoot, 'backend')
+const frontendDistDir = path.resolve(workspaceRoot, 'frontend', 'dist')
 const hasFrontendBuild = existsSync(frontendDistDir)
 
 app.disable('x-powered-by')
@@ -50,7 +50,7 @@ app.use(cookieParser())
 app.use(express.json({ limit: '1mb' }))
 app.use(express.urlencoded({ extended: true, limit: '1mb' }))
 app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'))
-app.use(['/uploads', '/api/uploads'], express.static(path.resolve(env.UPLOAD_DIR)))
+app.use(['/uploads', '/api/uploads'], express.static(path.resolve(backendRoot, env.UPLOAD_DIR)))
 
 app.use(['/auth', '/api/auth'], authRoutes)
 app.use(['/health', '/api/health'], healthRoute)

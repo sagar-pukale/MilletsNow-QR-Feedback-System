@@ -1,15 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { app } from '../backend/vercel-dist/app.js'
 
-type AppHandler = (req: VercelRequest, res: VercelResponse) => unknown
-
-let appPromise: Promise<AppHandler> | undefined
-
-function loadApp() {
-  appPromise ??= import('../backend/src/app.js').then(({ app }) => app as AppHandler)
-  return appPromise
-}
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const app = await loadApp()
+export default function handler(req: VercelRequest, res: VercelResponse) {
   return app(req, res)
 }
