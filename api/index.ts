@@ -16,6 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     console.error('Serverless bootstrap failed', error)
     const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : 'BOOTSTRAP_FAILED'
-    return res.status(500).json({ error: 'Server bootstrap failed', code })
+    const message = error instanceof Error ? error.message : 'Unknown bootstrap error'
+    return res.status(500).json({ error: 'Server bootstrap failed', code, message })
   }
 }
