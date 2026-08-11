@@ -1,6 +1,21 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { app } from '../backend/vercel-dist/app.js'
 
-export default function handler(req: VercelRequest, res: VercelResponse) {
-  return app(req, res)
+type AppHandler = (req: VercelRequest, res: VercelResponse) => unknown
+
+let appPromise: Promise<AppHandler> | undefined
+
+function loadApp() {
+  appPromise ??= import('../backend/vercel-dist/app.js').then(({ app }) => app as AppHandler)
+  return appPromise
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  try {
+    const app = await loadApp()
+    return app(req, res)
+  } catch (error) {
+    console.error('Serverless bootstrap failed', error)
+    const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : 'BOOTSTRAP_FAILED'
+    return res.status(500).json({ error: 'Server bootstrap failed', code })
+  }
 }
