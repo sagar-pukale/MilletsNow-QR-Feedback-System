@@ -12,5 +12,8 @@
     "build": "npm --workspace backend run build && npm --workspace frontend run build",
     "vercel-build": "npm --workspace backend exec -- prisma generate --schema src/prisma/schema.prisma && npm --workspace backend exec -- tsc -p tsconfig.vercel.json && npm --workspace frontend run build",
     "start": "npm run build && npm --workspace backend run start"
+  },
+  "devDependencies": {
+    "@vercel/node": "^5.9.8"
   }
 }
