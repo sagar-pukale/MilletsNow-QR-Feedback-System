@@ -1,12 +1,16 @@
 {
   "name": "milletsnow-qr-feedback-system",
   "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
   "scripts": {
-    "install:all": "npm --prefix backend install && npm --prefix frontend install",
+    "install:all": "npm install --workspaces --include-workspace-root",
     "dev": "node scripts/dev.mjs",
-    "vite": "npm --prefix backend install && npm --prefix backend run build && npm --prefix frontend install && npm --prefix frontend run build",
-    "build": "npm --prefix backend install && npm --prefix backend run build && npm --prefix frontend install && npm --prefix frontend run build",
-    "vercel-build": "npm --prefix backend install && npm --prefix backend run build && npm --prefix frontend install && npm --prefix frontend run build",
-    "start": "npm run build && npm --prefix backend run start"
+    "vite": "npm --workspace backend run build && npm --workspace frontend run build",
+    "build": "npm --workspace backend run build && npm --workspace frontend run build",
+    "vercel-build": "npm --workspace backend run build && npm --workspace frontend run build",
+    "start": "npm run build && npm --workspace backend run start"
   }
 }
