@@ -5,7 +5,7 @@
   "framework": "vite",
   "functions": {
     "api/index.ts": {
-      "includeFiles": "backend/node_modules/{.prisma/client/**,@prisma/client/**}"
+      "includeFiles": "backend/{dist/**,node_modules/.prisma/client/**,node_modules/@prisma/client/**}"
     }
   },
   "rewrites": [
