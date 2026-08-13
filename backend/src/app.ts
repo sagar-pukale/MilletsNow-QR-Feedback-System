@@ -17,6 +17,8 @@ import { authRoutes } from './routes/auth-routes.js'
 import { requireAuth } from './middleware/auth.js'
 import { healthRoute } from './routes/health-route.js'
 import { feedbackRoutes } from './routes/feedback-routes.js'
+import { analyticsRoutes } from './routes/analytics-routes.js'
+import { qrStickerTemplateRoutes } from './routes/qr-sticker-template-routes.js'
 import { getFrontendDistDir, getUploadRootDir } from './utils/upload-paths.js'
 
 export const app = express()
@@ -54,15 +56,17 @@ app.use(['/uploads', '/api/uploads'], express.static(getUploadRootDir()))
 
 app.use(['/auth', '/api/auth'], authRoutes)
 app.use(['/health', '/api/health'], healthRoute)
-app.use(['/products', '/api/products', '/qrcodes', '/api/qrcodes'], requireAuth)
+app.use(['/products', '/api/products', '/qrcodes', '/api/qrcodes', '/analytics', '/api/analytics', '/qr-sticker-templates', '/api/qr-sticker-templates'], requireAuth)
 app.use(['/products', '/api/products'], productRoutes)
 app.use(['/qrcodes', '/api/qrcodes'], qrCodeRoutes)
-app.use(['/scan', '/api/scan'], scanRoutes)
-app.use(['/feedback', '/api/feedback'], feedbackRoutes)
+app.use(['/analytics', '/api/analytics'], analyticsRoutes)
+app.use(['/qr-sticker-templates', '/api/qr-sticker-templates'], qrStickerTemplateRoutes)
+app.use('/api/scan', scanRoutes)
+app.use(['/feedback', '/api/feedback', '/complaint', '/api/complaint', '/compliment', '/api/compliment'], feedbackRoutes)
 
 if (hasFrontendBuild) {
   app.use(express.static(frontendDistDir))
-  app.get(/^(?!\/(?:auth|api\/auth|health|api\/health|products|api\/products|qrcodes|api\/qrcodes|scan|api\/scan|feedback|api\/feedback|uploads|api\/uploads)\b).*/, (_request, response) => {
+  app.get(/^(?!\/(?:auth|api\/auth|health|api\/health|products|api\/products|qrcodes|api\/qrcodes|analytics|api\/analytics|qr-sticker-templates|api\/qr-sticker-templates|api\/scan|feedback|api\/feedback|complaint|api\/complaint|compliment|api\/compliment|uploads|api\/uploads)\b).*/, (_request, response) => {
     response.sendFile(path.join(frontendDistDir, 'index.html'))
   })
 }

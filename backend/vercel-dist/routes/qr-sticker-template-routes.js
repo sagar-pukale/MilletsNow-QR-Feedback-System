@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.qrStickerTemplateRoutes = void 0;
+const express_1 = require("express");
+const qr_sticker_template_controller_js_1 = require("../controllers/qr-sticker-template-controller.js");
+exports.qrStickerTemplateRoutes = (0, express_1.Router)();
+exports.qrStickerTemplateRoutes.get('/', qr_sticker_template_controller_js_1.qrStickerTemplateController.list);
+exports.qrStickerTemplateRoutes.get('/:id', qr_sticker_template_controller_js_1.qrStickerTemplateController.get);
+exports.qrStickerTemplateRoutes.post('/', qr_sticker_template_controller_js_1.qrStickerTemplateController.create);
+exports.qrStickerTemplateRoutes.put('/:id', qr_sticker_template_controller_js_1.qrStickerTemplateController.update);
+exports.qrStickerTemplateRoutes.post('/:id/duplicate', qr_sticker_template_controller_js_1.qrStickerTemplateController.duplicate);
+exports.qrStickerTemplateRoutes.get('/:id/download', qr_sticker_template_controller_js_1.qrStickerTemplateController.downloadPdf);
+exports.qrStickerTemplateRoutes.delete('/:id', qr_sticker_template_controller_js_1.qrStickerTemplateController.remove);

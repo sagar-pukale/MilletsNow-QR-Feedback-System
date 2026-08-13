@@ -21,7 +21,7 @@ export const productController = {
     },
     async create(request, response, next) {
         try {
-            response.status(201).json(await productService.create({ ...request.body, imageUrl: request.file?.path ?? request.body.imageUrl }));
+            response.status(201).json(await productService.create(request.body, request.file));
         }
         catch (error) {
             next(error);
@@ -29,7 +29,15 @@ export const productController = {
     },
     async update(request, response, next) {
         try {
-            response.json(await productService.update(String(request.params.id), { ...request.body, ...(request.file ? { imageUrl: request.file.path } : {}) }));
+            response.json(await productService.update(String(request.params.id), request.body, request.file));
+        }
+        catch (error) {
+            next(error);
+        }
+    },
+    async uploadImage(request, response, next) {
+        try {
+            response.json(await productService.uploadImage(String(request.params.id), request.file));
         }
         catch (error) {
             next(error);

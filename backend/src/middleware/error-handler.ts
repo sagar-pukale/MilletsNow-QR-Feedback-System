@@ -10,6 +10,10 @@ export const errorHandler: ErrorRequestHandler = (error, _request, response, _ne
       details: error.flatten?.()?.fieldErrors ?? error,
     })
   }
-  const message = error instanceof Error ? error.message : 'Internal server error'
-  response.status(500).json({ error: message })
+  const statusCode = typeof error?.statusCode === 'number' ? error.statusCode : 500
+  const message =
+    typeof error?.message === 'string' && error.message.trim()
+      ? error.message
+      : 'Something went wrong. Please try again.'
+  response.status(statusCode).json({ error: message })
 }

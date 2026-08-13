@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { apiPath } from '@/lib/api'
 
-export const API_URL = import.meta.env.VITE_API_URL ?? ''
 export type AuthUser = { id: string; email: string; fullName: string; role: string }
 type AuthContextValue = {
   user: AuthUser | null
@@ -24,7 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = async () => {
     try {
-      const response = await fetch(`${API_URL}/auth/me`, { credentials: 'include' })
+      const response = await fetch(apiPath('/auth/me'), { credentials: 'include' })
       if (!response.ok) throw new Error('Unauthenticated')
       const body = (await response.json()) as { user: AuthUser }
       setUser(body.user)
@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await fetch(`${API_URL}/auth/logout`, { method: 'POST', credentials: 'include' })
+      await fetch(apiPath('/auth/logout'), { method: 'POST', credentials: 'include' })
     } finally {
       setUser(null)
     }
@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true
     const init = async () => {
       try {
-        const response = await fetch(`${API_URL}/auth/me`, { credentials: 'include' })
+        const response = await fetch(apiPath('/auth/me'), { credentials: 'include' })
         if (!response.ok) throw new Error('Unauthenticated')
         const body = (await response.json()) as { user: AuthUser }
         if (active) setUser(body.user)

@@ -1,46 +1,15 @@
-import { BarChart3Icon, MoreHorizontalIcon, PackageSearchIcon } from 'lucide-react'
-import { useState } from 'react'
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { BarChart3Icon, HeartIcon, LoaderCircleIcon, MessageSquareTextIcon, MoreHorizontalIcon, PackageSearchIcon, RefreshCwIcon, ShieldAlertIcon } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts'
 
 import { StatCard } from '@/components/dashboard'
-import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from '@/components/ui/chart'
-import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
-import {
-  PageContainer,
-  PageDescription,
-  PageHeader,
-  PageHeading,
-  PageLayout,
-  PageTitle,
-} from '@/components/layout/page-layout'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
+import { PageContainer, PageDescription, PageHeader, PageHeading, PageLayout, PageTitle } from '@/components/layout/page-layout'
+import { apiPath } from '@/lib/api'
 import { cn } from '@/lib/utils'
-
-import {
-  dashboardStats,
-  messageAnalyticsData,
-  productsByMessages,
-  summaryMetrics,
-} from './dashboard-data'
 
 const analyticsTabs = [
   'Message Analytics',
@@ -50,7 +19,6 @@ const analyticsTabs = [
 
 const metricOptions = [
   { key: 'feedback', label: 'Feedback' },
-  { key: 'questions', label: 'Questions' },
   { key: 'compliments', label: 'Compliments' },
   { key: 'complaints', label: 'Complaints' },
   { key: 'totalMessages', label: 'Total Messages' },
@@ -59,6 +27,37 @@ const metricOptions = [
 ] as const
 
 type MetricKey = (typeof metricOptions)[number]['key']
+
+type AnalyticsResponse = {
+  filters: {
+    startDate: string
+    endDate: string
+    productId: string | null
+  }
+  cards: {
+    feedback: number
+    compliments: number
+    complaints: number
+  }
+  summary: {
+    totalMessages: number
+    activeCustomers: number
+    averageResponseTimeHours: number | null
+    scans: number
+  }
+  charts: Array<Record<MetricKey | 'day', number | string>>
+  productsByMessages: Array<{ name: string; value: number; messages: string; color: string }>
+  productOptions: Array<{ id: string; name: string; sku: string }>
+}
+
+const chartConfig = {
+  feedback: { label: 'Feedback', color: '#6A1634' },
+  compliments: { label: 'Compliments', color: '#16A34A' },
+  complaints: { label: 'Complaints', color: '#F59E0B' },
+  totalMessages: { label: 'Total Messages', color: '#A855F7' },
+  customers: { label: 'Customers', color: '#0F766E' },
+  scans: { label: 'Scans', color: '#DB2777' },
+} satisfies ChartConfig
 
 const emptyStateSubtitle = 'Customer activity will appear here once QR codes are scanned.'
 
@@ -74,21 +73,148 @@ function EmptyAnalyticsState({ icon: Icon, className }: { icon: typeof BarChart3
   )
 }
 
-const chartConfig = {
-  feedback: { label: 'Feedback', color: '#6A1634' },
-  questions: { label: 'Questions', color: '#2563EB' },
-  compliments: { label: 'Compliments', color: '#16A34A' },
-  complaints: { label: 'Complaints', color: '#F59E0B' },
-  totalMessages: { label: 'Total Messages', color: '#A855F7' },
-  customers: { label: 'Customers', color: '#0F766E' },
-  scans: { label: 'Scans', color: '#DB2777' },
-} satisfies ChartConfig
+function formatLocalDate(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function shiftLocalDays(date: Date, days: number) {
+  const copy = new Date(date)
+  copy.setDate(copy.getDate() + days)
+  return copy
+}
+
+function buildDateRange() {
+  const today = new Date()
+  return {
+    startDate: formatLocalDate(shiftLocalDays(today, -29)),
+    endDate: formatLocalDate(today),
+  }
+}
+
+function metricTotal(charts: AnalyticsResponse['charts'], metric: MetricKey) {
+  return charts.reduce((sum, row) => sum + Number(row[metric] ?? 0), 0)
+}
 
 function DashboardPage() {
   const [activeTab, setActiveTab] = useState<(typeof analyticsTabs)[number]>('Message Analytics')
   const [activeMetric, setActiveMetric] = useState<MetricKey>('feedback')
+  const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState('')
+  const [refreshKey, setRefreshKey] = useState(0)
+  const hasLoadedRef = useRef(false)
+
   const activeMetricLabel = chartConfig[activeMetric].label
   const activeMetricColor = chartConfig[activeMetric].color ?? '#6A1634'
+  const { startDate, endDate } = useMemo(() => buildDateRange(), [])
+
+  useEffect(() => {
+    let active = true
+
+    const loadAnalytics = async () => {
+      const firstLoad = !hasLoadedRef.current
+      setError('')
+      setLoading(firstLoad)
+      setRefreshing(!firstLoad)
+
+      try {
+        const params = new URLSearchParams({
+          startDate,
+          endDate,
+          timeZoneOffsetMinutes: String(new Date().getTimezoneOffset()),
+        })
+
+        const response = await fetch(`${apiPath('/analytics/dashboard')}?${params.toString()}`, {
+          credentials: 'include',
+        })
+        const contentType = response.headers.get('content-type') ?? ''
+
+        if (!contentType.includes('application/json')) {
+          throw new Error('Analytics endpoint returned a non-JSON response.')
+        }
+
+        const body = (await response.json()) as AnalyticsResponse | { error?: string }
+        if (!response.ok) {
+          throw new Error('error' in body && body.error ? body.error : 'Unable to load dashboard analytics.')
+        }
+
+        if (active) {
+          setAnalytics(body as AnalyticsResponse)
+          hasLoadedRef.current = true
+        }
+      } catch (reason: unknown) {
+        if (active) setError(reason instanceof Error ? reason.message : 'Unable to load dashboard analytics.')
+      } finally {
+        if (active) {
+          setLoading(false)
+          setRefreshing(false)
+        }
+      }
+    }
+
+    void loadAnalytics()
+    return () => {
+      active = false
+    }
+  }, [endDate, refreshKey, startDate])
+
+  const stats = useMemo(() => ([
+    {
+      label: 'Feedback',
+      value: analytics ? String(analytics.cards.feedback) : '—',
+      trend: '',
+      trendLabel: loading ? 'Loading...' : error ? 'Unavailable' : 'Last 30 days',
+      positive: true,
+      icon: MessageSquareTextIcon,
+      tone: 'brand' as const,
+    },
+    {
+      label: 'Compliments',
+      value: analytics ? String(analytics.cards.compliments) : '—',
+      trend: '',
+      trendLabel: loading ? 'Loading...' : error ? 'Unavailable' : 'Last 30 days',
+      positive: true,
+      icon: HeartIcon,
+      tone: 'green' as const,
+    },
+    {
+      label: 'Complaints',
+      value: analytics ? String(analytics.cards.complaints) : '—',
+      trend: '',
+      trendLabel: loading ? 'Loading...' : error ? 'Unavailable' : 'Last 30 days',
+      positive: true,
+      icon: ShieldAlertIcon,
+      tone: 'rose' as const,
+    },
+  ]), [analytics, error, loading])
+
+  const summaryMetrics = useMemo(() => ([
+    {
+      label: 'Total Messages',
+      value: analytics ? String(analytics.summary.totalMessages) : '—',
+    },
+    {
+      label: 'Active Customers',
+      value: analytics ? String(analytics.summary.activeCustomers) : '—',
+    },
+    {
+      label: 'Avg. Response Time',
+      value: analytics?.summary.averageResponseTimeHours != null ? `${analytics.summary.averageResponseTimeHours}h` : loading ? 'Loading...' : '--',
+    },
+    {
+      label: 'Scans',
+      value: analytics ? String(analytics.summary.scans) : '—',
+    },
+  ]), [analytics, loading])
+
+  const chartData = analytics?.charts ?? []
+  const activeMetricTotal = analytics ? metricTotal(chartData, activeMetric) : 0
+  const yAxisMax = Math.max(1, ...chartData.map((row) => Number(row[activeMetric] ?? 0)))
+  const showEmptyChart = !loading && !error && activeMetricTotal === 0
 
   return (
     <PageLayout className="bg-[#F7F8FA]">
@@ -106,18 +232,27 @@ function DashboardPage() {
             </PageHeading>
             <div className="hidden items-center gap-2 sm:flex">
               <Badge variant="success" className="h-8">
-                <span className="size-1.5 animate-pulse rounded-full bg-success" />
-                Live data preview
+                <span className={cn('size-1.5 rounded-full bg-success', refreshing ? 'animate-pulse' : '')} />
+                Live data
               </Badge>
-              <Button type="button" variant="outline" size="sm">
-                <MoreHorizontalIcon aria-hidden="true" />
-                More actions
+              <Button type="button" variant="outline" size="sm" onClick={() => setRefreshKey((value) => value + 1)}>
+                <RefreshCwIcon aria-hidden="true" className={cn(refreshing ? 'animate-spin' : '')} />
+                Refresh
               </Button>
             </div>
           </PageHeader>
 
+          {error ? (
+            <Card className="border-destructive/30">
+              <CardContent className="flex items-center gap-2 p-5 text-sm text-destructive">
+                <ShieldAlertIcon className="size-4" />
+                {error}
+              </CardContent>
+            </Card>
+          ) : null}
+
           <section aria-label="Message metrics" className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-            {dashboardStats.map((stat) => (
+            {stats.map((stat) => (
               <StatCard key={stat.label} {...stat} />
             ))}
           </section>
@@ -183,23 +318,33 @@ function DashboardPage() {
               <CardContent className="pt-0">
                 <div className="mb-3 flex items-baseline gap-2">
                   <span className="font-heading text-3xl font-bold tracking-tight text-foreground">
-                    0
+                    {loading ? '—' : activeMetricTotal}
                   </span>
-                  <span className="text-xs text-muted-foreground">{activeMetricLabel} over 14 days</span>
+                  <span className="text-xs text-muted-foreground">{activeMetricLabel} in the last 30 days</span>
                 </div>
                 <div className="relative">
                   <ChartContainer config={chartConfig} className="h-[310px] w-full aspect-auto">
-                  <LineChart data={messageAnalyticsData} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
-                    <CartesianGrid vertical={false} strokeDasharray="4 4" />
-                    <XAxis dataKey="day" ticks={['01 May', '07 May', '14 May']} tickLine={false} axisLine={false} tickMargin={10} minTickGap={28} />
-                    <YAxis domain={[0, 1]} ticks={[0, 1]} tickLine={false} axisLine={false} width={42} tickMargin={8} />
-                    <ChartTooltip cursor={{ stroke: activeMetricColor, strokeOpacity: 0.14 }} content={<ChartTooltipContent />} />
-                    <Line type="monotone" dataKey={activeMetric} stroke={activeMetricColor} strokeWidth={3} dot={false} activeDot={{ r: 5, fill: activeMetricColor, stroke: '#fff', strokeWidth: 3 }} />
-                  </LineChart>
+                    <LineChart data={chartData} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+                      <CartesianGrid vertical={false} strokeDasharray="4 4" />
+                      <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={10} minTickGap={28} />
+                      <YAxis domain={[0, yAxisMax]} tickLine={false} axisLine={false} width={42} tickMargin={8} allowDecimals={false} />
+                      <ChartTooltip cursor={{ stroke: activeMetricColor, strokeOpacity: 0.14 }} content={<ChartTooltipContent />} />
+                      <Line type="monotone" dataKey={activeMetric} stroke={activeMetricColor} strokeWidth={3} dot={false} activeDot={{ r: 5, fill: activeMetricColor, stroke: '#fff', strokeWidth: 3 }} />
+                    </LineChart>
                   </ChartContainer>
-                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <EmptyAnalyticsState icon={BarChart3Icon} />
-                  </div>
+                  {loading ? (
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                      <div className="inline-flex items-center gap-2 rounded-full bg-card/95 px-4 py-2 text-sm font-medium text-muted-foreground shadow-sm">
+                        <LoaderCircleIcon className="size-4 animate-spin" />
+                        Loading analytics...
+                      </div>
+                    </div>
+                  ) : null}
+                  {showEmptyChart ? (
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                      <EmptyAnalyticsState icon={BarChart3Icon} />
+                    </div>
+                  ) : null}
                 </div>
               </CardContent>
             </Card>
@@ -217,16 +362,8 @@ function DashboardPage() {
                         <p className="truncate text-xs font-medium text-muted-foreground">{metric.label}</p>
                         <p className="mt-1 font-heading text-lg font-bold text-foreground">{metric.value}</p>
                       </div>
-                      {metric.detail ? <span className="text-xs font-bold text-success">{metric.detail}</span> : null}
                     </div>
                   ))}
-                  <div className="border-t pt-4">
-                    <div className="mb-2 flex items-center justify-between text-xs font-semibold">
-                      <span className="text-muted-foreground">Goal completion</span>
-                      <span className="text-primary">0%</span>
-                    </div>
-                    <Progress value={0} className="h-1.5 [&_[data-slot=progress-indicator]]:bg-primary [&_[data-slot=progress-track]]:h-1.5" />
-                  </div>
                 </CardContent>
               </Card>
 
@@ -236,7 +373,7 @@ function DashboardPage() {
                   <CardDescription className="mt-1">Highest engagement this period</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {productsByMessages.length ? productsByMessages.map((product) => (
+                  {(analytics?.productsByMessages.length ?? 0) > 0 ? analytics!.productsByMessages.map((product) => (
                     <div key={product.name}>
                       <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
                         <span className="truncate font-semibold text-foreground">{product.name}</span>
@@ -246,7 +383,13 @@ function DashboardPage() {
                         <div className={cn('h-full rounded-full transition-all', product.color)} style={{ width: `${product.value}%` }} />
                       </div>
                     </div>
-                  )) : <EmptyAnalyticsState icon={PackageSearchIcon} className="min-h-[176px]" />}
+                  )) : loading ? (
+                    <div className="flex min-h-[176px] items-center justify-center text-sm text-muted-foreground">
+                      Loading products...
+                    </div>
+                  ) : (
+                    <EmptyAnalyticsState icon={PackageSearchIcon} className="min-h-[176px]" />
+                  )}
                 </CardContent>
               </Card>
             </div>

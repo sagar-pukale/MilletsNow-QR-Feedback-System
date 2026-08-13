@@ -3,7 +3,7 @@ import { HelpCircleIcon, HeartIcon, MessageSquareIcon, MessageSquareWarningIcon 
 import { Card, CardContent } from '@/components/ui/card'
 import { EmptyState } from '@/components/common/empty-state'
 import { PageContainer, PageDescription, PageHeader, PageHeading, PageLayout, PageTitle } from '@/components/layout/page-layout'
-import { API_URL } from '@/context/auth-context'
+import { apiPath } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 
 type Message = {
@@ -26,7 +26,7 @@ function MessagesPage() {
 
     const fetchInitialMessages = async () => {
       try {
-        const response = await fetch(`${API_URL}/feedback?limit=100`, { credentials: 'include' })
+        const response = await fetch(apiPath('/feedback?limit=100'), { credentials: 'include' })
         if (!response.ok) {
           throw new Error(
             response.status === 401

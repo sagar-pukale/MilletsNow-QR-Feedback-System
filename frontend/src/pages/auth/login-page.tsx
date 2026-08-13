@@ -4,10 +4,11 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { API_URL, useAuth, type AuthUser } from '@/context/auth-context'
+import { useAuth, type AuthUser } from '@/context/auth-context'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { apiPath } from '@/lib/api'
 
 const schema = z.object({
   email: z.string().trim().email('Enter a valid email address'),
@@ -35,7 +36,7 @@ function LoginPage() {
   const onSubmit = async (values: FormValues) => {
     setServerError('')
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
+      const response = await fetch(apiPath('/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -115,7 +116,7 @@ function LoginPage() {
           </Button>
         </form>
         <Link
-          to="/scan/demo-qr-001"
+          to="/scan/MN-LADO-00001"
           className="mt-6 block text-center text-xs text-muted-foreground hover:text-primary"
         >
           Open customer QR experience

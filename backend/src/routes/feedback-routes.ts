@@ -1,10 +1,16 @@
+import type { NextFunction, Request, Response } from 'express'
 import { Router } from 'express'
+import multer from 'multer'
+import path from 'node:path'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../config/prisma.js'
 import { requireAuth } from '../middleware/auth.js'
 import { feedbackSchema } from '../validators/feedback-validator.js'
+import { getUploadRootDir } from '../utils/upload-paths.js'
 
 export const feedbackRoutes = Router()
+const upload = multer({ dest: path.join(getUploadRootDir(), 'feedback') })
+const toPublicUploadPath = (value?: string) => (value ? `/uploads/feedback/${path.basename(value)}` : null)
 
 type FeedbackWithProduct = Prisma.FeedbackGetPayload<{
   include: {
@@ -15,9 +21,14 @@ type FeedbackWithProduct = Prisma.FeedbackGetPayload<{
   }
 }>
 
-feedbackRoutes.post('/', async (request, response, next) => {
+type UploadRequest = Request & { file?: Express.Multer.File }
+
+async function submitFeedback(request: UploadRequest, response: Response, next: NextFunction) {
   try {
-    const input = feedbackSchema.parse(request.body)
+    const input = feedbackSchema.parse({
+      ...request.body,
+      type: resolveSubmissionType(request.baseUrl, request.body.type),
+    })
     const qr = input.qrToken
       ? await prisma.qRCode.findUnique({
           where: { code: input.qrToken },
@@ -32,12 +43,19 @@ feedbackRoutes.post('/', async (request, response, next) => {
     const created = await prisma.feedback.create({
       data: {
         rating: input.rating,
-        message: input.message,
+        message: input.message ?? null,
+        imageUrl: toPublicUploadPath(request.file?.path),
+        quality: input.quality ?? null,
+        category: input.category ?? null,
         status: 'new',
         ...(qr ? { productId: qr.productId, batchId: qr.batchId, qrCodeId: qr.id } : {}),
-        ...(input.type === 'question' ? { question: { create: { question: input.message } } } : {}),
-        ...(input.type === 'compliment' ? { compliment: { create: { message: input.message } } } : {}),
-        ...(input.type === 'complaint' ? { complaint: { create: { severity: 1, resolutionNotes: input.message } } } : {}),
+        ...(input.type === 'question' && input.message ? { question: { create: { question: input.message } } } : {}),
+        ...(input.type === 'compliment'
+          ? { compliment: { create: { message: input.message ?? 'Customer compliment submitted' } } }
+          : {}),
+        ...(input.type === 'complaint'
+          ? { complaint: { create: { severity: 1, resolutionNotes: input.category ?? input.message ?? 'Customer complaint submitted' } } }
+          : {}),
       },
     })
 
@@ -45,7 +63,9 @@ feedbackRoutes.post('/', async (request, response, next) => {
   } catch (error) {
     next(error)
   }
-})
+}
+
+feedbackRoutes.post('/', upload.single('image'), submitFeedback)
 
 feedbackRoutes.get('/', requireAuth, async (request, response, next) => {
   try {
@@ -73,6 +93,9 @@ feedbackRoutes.get('/', requireAuth, async (request, response, next) => {
         id: f.id,
         rating: f.rating,
         message: f.message,
+        imageUrl: f.imageUrl,
+        quality: f.quality,
+        category: f.category,
         status: f.status,
         submittedAt: f.submittedAt,
         productName: f.product?.name ?? null,
@@ -84,3 +107,13 @@ feedbackRoutes.get('/', requireAuth, async (request, response, next) => {
     next(error)
   }
 })
+
+function resolveSubmissionType(baseUrl: string, submittedType: unknown) {
+  if (typeof submittedType === 'string' && submittedType.length) {
+    return submittedType
+  }
+
+  if (baseUrl.includes('complaint')) return 'complaint'
+  if (baseUrl.includes('compliment')) return 'compliment'
+  return 'feedback'
+}

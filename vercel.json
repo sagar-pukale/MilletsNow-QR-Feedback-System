@@ -34,15 +34,31 @@
       "destination": "/api/index.ts"
     },
     {
-      "source": "/scan/(.*)",
-      "destination": "/api/index.ts"
-    },
-    {
       "source": "/feedback/(.*)",
       "destination": "/api/index.ts"
     },
     {
-      "source": "/((?!api/|auth/|auth$|health$|products/|qrcodes/|scan/|feedback/).*)",
+      "source": "/feedback",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/complaint/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/complaint",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/compliment/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/compliment",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/((?!api/|auth/|auth$|health$|products/|qrcodes/|feedback/|complaint/|compliment/).*)",
       "destination": "/index.html"
     }
   ]

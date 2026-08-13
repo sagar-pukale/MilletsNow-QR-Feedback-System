@@ -1,41 +1,355 @@
-import { useEffect, useState } from 'react'
-import { ArrowLeftIcon, StarIcon, WheatIcon } from 'lucide-react'
-import { Link, useParams } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import { ArrowLeftIcon, ImagePlusIcon, LoaderCircleIcon, StarIcon, TriangleAlertIcon } from 'lucide-react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { API_URL } from '@/context/auth-context'
+import { BrandHeader, CustomerPageShell, FollowUs, ProductHero, resolveAssetUrl, type ScanPayload } from './scan-shared'
 
-const categories = ['Product Quality', 'Taste', 'Packaging', 'Value for Money', 'Overall Experience']
+type FlowType = 'feedback' | 'complaint' | 'compliment'
+type Errors = Partial<Record<'rating' | 'quality' | 'message' | 'category' | 'form', string>>
+
+const qualityOptions = ['Excellent', 'Good', 'Average', 'Poor'] as const
+const complaintCategories = ['Product Quality', 'Packaging', 'Delivery', 'Other'] as const
 
 function FeedbackPage() {
   const { qrToken = '' } = useParams()
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const submissionType = useMemo<FlowType>(() => {
+    const raw = searchParams.get('type')
+    return raw === 'complaint' || raw === 'compliment' ? raw : 'feedback'
+  }, [searchParams])
+
+  const [payload, setPayload] = useState<ScanPayload | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [loadingError, setLoadingError] = useState('')
   const [rating, setRating] = useState(0)
-  const [submitted, setSubmitted] = useState(false)
+  const [quality, setQuality] = useState('')
+  const [category, setCategory] = useState('')
   const [message, setMessage] = useState('')
+  const [image, setImage] = useState<File | null>(null)
+  const [errors, setErrors] = useState<Errors>({})
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
-  const [productName, setProductName] = useState('MilletsNow product')
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
-    fetch(`${API_URL}/scan/${encodeURIComponent(qrToken)}`)
-      .then((response) => response.ok ? response.json() as Promise<{ product?: { name?: string } }> : null)
-      .then((payload) => { if (payload?.product?.name) setProductName(payload.product.name) })
-      .catch(() => undefined)
+    let active = true
+
+    fetch(`/api/scan/${encodeURIComponent(qrToken)}`)
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(
+            response.status === 404
+              ? 'This product QR is invalid or no longer active.'
+              : 'We could not load this product right now.',
+          )
+        }
+
+        return response.json() as Promise<ScanPayload>
+      })
+      .then((body) => {
+        if (active) setPayload(body)
+      })
+      .catch((reason: unknown) => {
+        if (active) setLoadingError(reason instanceof Error ? reason.message : 'We could not load this product right now.')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
   }, [qrToken])
 
-  const submitFeedback = async () => {
-    setSubmitting(true); setError('')
-    try {
-      const response = await fetch(`${API_URL}/feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'feedback', qrToken, rating, message: message.trim() || 'Customer feedback submitted' }) })
-      if (!response.ok) throw new Error('Unable to submit feedback')
-      setSubmitted(true)
-    } catch { setError('Unable to submit feedback right now. Please try again.') } finally { setSubmitting(false) }
+  const copy = getCopy(submissionType)
+  const imagePreview = image ? URL.createObjectURL(image) : null
+
+  useEffect(
+    () => () => {
+      if (imagePreview) URL.revokeObjectURL(imagePreview)
+    },
+    [imagePreview],
+  )
+
+  const validate = () => {
+    const nextErrors: Errors = {}
+
+    if ((submissionType === 'feedback' || submissionType === 'compliment') && !rating) {
+      nextErrors.rating = 'Please select a rating.'
+    }
+
+    if (submissionType === 'feedback' && !quality) {
+      nextErrors.quality = 'Please select taste / quality.'
+    }
+
+    if (submissionType === 'complaint') {
+      if (!category) nextErrors.category = 'Please select a complaint category.'
+      if (!message.trim()) nextErrors.message = 'Please describe the complaint.'
+    }
+
+    setErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
   }
 
-  if (submitted) return <main className="flex min-h-screen items-center justify-center bg-white px-5 text-center"><div><div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600"><StarIcon className="size-7 fill-current" /></div><h1 className="mt-5 font-heading text-2xl font-bold">Thank you for your feedback!</h1><p className="mt-2 text-sm text-muted-foreground">Your experience helps us make MilletsNow better.</p><Link to={`/scan/${qrToken}`} className="mt-6 inline-flex h-10 items-center rounded-lg bg-primary px-5 text-sm font-semibold text-white">Back to product</Link></div></main>
+  const submit = async () => {
+    if (!validate()) return
 
-  return <main className="min-h-screen bg-[#fafafa] text-foreground"><div className="mx-auto w-full max-w-lg px-5 py-6 sm:py-10"><header className="flex items-center justify-between"><Link to={`/scan/${qrToken}`} className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-primary"><ArrowLeftIcon className="size-4" /> Back</Link><div className="flex items-center gap-2 text-primary"><span className="flex size-8 items-center justify-center rounded-lg bg-primary text-white"><WheatIcon className="size-4" /></span><span className="font-heading font-bold">MilletsNow</span></div></header><section className="mt-8 rounded-3xl border border-border/70 bg-white p-5 shadow-card sm:p-7"><p className="text-xs font-bold tracking-[0.14em] text-primary uppercase">{productName}</p><h1 className="mt-2 font-heading text-2xl font-bold">How was your experience?</h1><div className="mt-5 flex justify-center gap-2" aria-label="Rating"><span className="sr-only">Rating: {rating} out of 5</span>{[1, 2, 3, 4, 5].map((value) => <button key={value} type="button" aria-label={`${value} stars`} onClick={() => setRating(value)} className="rounded-lg p-1 text-amber-400 transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-primary"><StarIcon className={`size-8 ${value <= rating ? 'fill-current' : ''}`} /></button>)}</div><div className="mt-7 space-y-4">{categories.map((category) => <label key={category} className="flex items-center justify-between rounded-xl border border-border/70 px-4 py-3 text-sm font-medium"><span>{category}</span><input type="checkbox" className="size-4 accent-primary" /></label>)}</div><label className="mt-6 block text-sm font-semibold">Tell us more...<Textarea value={message} onChange={(event) => setMessage(event.target.value)} className="mt-2 min-h-28 resize-none" placeholder="Share your thoughts with us" /></label><div className="mt-6 space-y-3"><Input placeholder="Name" aria-label="Name" /><Input placeholder="Mobile" type="tel" aria-label="Mobile" /><Input placeholder="Email" type="email" aria-label="Email" /></div>{error ? <p role="alert" className="mt-4 text-sm text-destructive">{error}</p> : null}<Button type="button" className="mt-6 h-12 w-full rounded-xl text-base" disabled={!rating || submitting} onClick={() => void submitFeedback()}>{submitting ? 'Submitting…' : 'Submit Feedback'}</Button></section></div></main>
+    setSubmitting(true)
+    setErrors({})
+
+    const body = new FormData()
+    body.append('type', submissionType)
+    body.append('qrToken', qrToken)
+    if (rating) body.append('rating', String(rating))
+    if (quality) body.append('quality', quality)
+    if (category) body.append('category', category)
+    if (message.trim()) body.append('message', message.trim())
+    if (image) body.append('image', image)
+
+    try {
+      const response = await fetch('/api/feedback', { method: 'POST', body })
+      const payloadBody = (await response.json().catch(() => null)) as { error?: string; details?: Record<string, string[]> } | null
+
+      if (!response.ok) {
+        if (payloadBody?.details) {
+          const nextErrors: Errors = {}
+          for (const [key, value] of Object.entries(payloadBody.details)) {
+            if (Array.isArray(value) && value[0]) {
+              nextErrors[key as keyof Errors] = value[0]
+            }
+          }
+          setErrors(nextErrors)
+        }
+        throw new Error(payloadBody?.error ?? 'Unable to submit your response right now.')
+      }
+
+      navigate(`/scan/${qrToken}/thank-you?type=${submissionType}`, {
+        replace: true,
+        state: { productName: payload?.product.name ?? 'MilletsNow product' },
+      })
+    } catch (reason: unknown) {
+      setErrors((current) => ({
+        ...current,
+        form: reason instanceof Error ? reason.message : 'Unable to submit your response right now.',
+      }))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <CustomerPageShell>
+        <BrandHeader />
+        <div className="rounded-[2rem] border border-border/70 bg-white px-6 py-14 text-center shadow-card">
+          <p className="text-sm text-muted-foreground">Loading form...</p>
+        </div>
+      </CustomerPageShell>
+    )
+  }
+
+  if (!payload || loadingError) {
+    return (
+      <CustomerPageShell>
+        <BrandHeader />
+        <div className="rounded-[2rem] border border-border/70 bg-white px-6 py-12 text-center shadow-card">
+          <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+            <TriangleAlertIcon className="size-7" />
+          </div>
+          <h1 className="mt-5 font-heading text-2xl font-bold">Form unavailable</h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{loadingError}</p>
+        </div>
+      </CustomerPageShell>
+    )
+  }
+
+  return (
+    <CustomerPageShell>
+      <BrandHeader />
+      <div className="mb-4">
+        <Link to={`/scan/${qrToken}`} className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary">
+          <ArrowLeftIcon className="size-4" />
+          Back
+        </Link>
+      </div>
+      <ProductHero product={payload.product} subtitle={copy.subtitle} />
+      <section className="mt-6 rounded-[2rem] border border-border/70 bg-white p-5 shadow-card">
+        <div className="mb-5 flex items-center gap-4">
+          <div className="flex size-14 items-center justify-center overflow-hidden rounded-2xl bg-brand-50">
+            {resolveAssetUrl(payload.product.image) ? (
+              <img src={resolveAssetUrl(payload.product.image) ?? ''} alt="" className="size-full object-cover" />
+            ) : (
+              <StarIcon className="size-6 text-brand-700" />
+            )}
+          </div>
+          <div>
+            <p className="text-xs font-bold tracking-[0.14em] text-primary uppercase">{copy.eyebrow}</p>
+            <h1 className="font-heading text-2xl font-bold">{copy.title}</h1>
+          </div>
+        </div>
+
+        {(submissionType === 'feedback' || submissionType === 'compliment') ? (
+          <Field label="Overall experience">
+            <div className="flex gap-2">
+              {[1, 2, 3, 4, 5].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-label={`${value} star${value > 1 ? 's' : ''}`}
+                  onClick={() => setRating(value)}
+                  className="rounded-2xl p-1.5 text-amber-400 transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-primary"
+                >
+                  <StarIcon className={`size-8 ${value <= rating ? 'fill-current' : ''}`} />
+                </button>
+              ))}
+            </div>
+            {errors.rating ? <FieldError message={errors.rating} /> : null}
+          </Field>
+        ) : null}
+
+        {submissionType === 'feedback' ? (
+          <Field label="Taste / Quality">
+            <div className="grid grid-cols-2 gap-3">
+              {qualityOptions.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setQuality(option)}
+                  className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors ${
+                    quality === option ? 'border-primary bg-brand-50 text-primary' : 'border-border bg-secondary/40 text-foreground'
+                  }`}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+            {errors.quality ? <FieldError message={errors.quality} /> : null}
+          </Field>
+        ) : null}
+
+        {submissionType === 'complaint' ? (
+          <Field label="Complaint category">
+            <div className="grid grid-cols-2 gap-3">
+              {complaintCategories.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setCategory(option)}
+                  className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors ${
+                    category === option ? 'border-primary bg-brand-50 text-primary' : 'border-border bg-secondary/40 text-foreground'
+                  }`}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+            {errors.category ? <FieldError message={errors.category} /> : null}
+          </Field>
+        ) : null}
+
+        <Field label={copy.messageLabel}>
+          <Textarea
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            className="min-h-32 resize-none"
+            placeholder={copy.messagePlaceholder}
+            aria-invalid={Boolean(errors.message)}
+          />
+          {errors.message ? <FieldError message={errors.message} /> : null}
+        </Field>
+
+        {(submissionType === 'feedback' || submissionType === 'complaint') ? (
+          <Field label="Optional image upload">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(event) => setImage(event.target.files?.[0] ?? null)}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex min-h-14 w-full items-center justify-between rounded-2xl border border-dashed border-border bg-secondary/40 px-4 text-left text-sm"
+            >
+              <span className="flex items-center gap-3">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-white text-primary">
+                  <ImagePlusIcon className="size-5" />
+                </span>
+                <span>{image ? image.name : 'Choose an image'}</span>
+              </span>
+              <span className="text-muted-foreground">Upload</span>
+            </button>
+            {imagePreview ? (
+              <img src={imagePreview} alt="Selected upload preview" className="mt-3 h-28 w-28 rounded-2xl object-cover" />
+            ) : null}
+          </Field>
+        ) : null}
+
+        {errors.form ? <FieldError message={errors.form} className="mt-2" /> : null}
+
+        <Button type="button" size="lg" className="mt-6 h-12 w-full rounded-2xl" disabled={submitting} onClick={() => void submit()}>
+          {submitting ? (
+            <>
+              <LoaderCircleIcon className="size-5 animate-spin" />
+              Submitting...
+            </>
+          ) : (
+            copy.submitLabel
+          )}
+        </Button>
+      </section>
+      <FollowUs className="mt-6" />
+    </CustomerPageShell>
+  )
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="mb-5 block">
+      <span className="mb-3 block text-sm font-semibold text-foreground">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function FieldError({ message, className = '' }: { message: string; className?: string }) {
+  return <p className={`mt-2 text-sm text-destructive ${className}`}>{message}</p>
+}
+
+function getCopy(type: FlowType) {
+  if (type === 'complaint') {
+    return {
+      eyebrow: 'Complaint',
+      title: 'Report an issue',
+      subtitle: 'Tell us what went wrong so we can resolve it quickly.',
+      messageLabel: 'Complaint description',
+      messagePlaceholder: 'Describe the issue you faced with this product.',
+      submitLabel: 'Submit Complaint',
+    }
+  }
+
+  if (type === 'compliment') {
+    return {
+      eyebrow: 'Rate & Compliment',
+      title: 'Rate and share what you liked',
+      subtitle: 'Rate the product and tell us what stood out for you.',
+      messageLabel: 'Tell us what you liked about the product',
+      messagePlaceholder: 'Share your compliment or appreciation.',
+      submitLabel: 'Submit Rating',
+    }
+  }
+
+  return {
+    eyebrow: 'Feedback',
+    title: 'Share your experience',
+    subtitle: 'Help us improve with your honest feedback.',
+    messageLabel: 'Customer feedback / message',
+    messagePlaceholder: 'Tell us more about your experience.',
+    submitLabel: 'Submit Feedback',
+  }
 }
 
 export default FeedbackPage
