@@ -1,11 +1,20 @@
 import 'dotenv/config'
 import { z } from 'zod'
 
+const isProduction = process.env.NODE_ENV === 'production'
+const developmentDefaults = isProduction
+  ? {}
+  : {
+      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/milletsnow',
+      JWT_SECRET: 'development-only-change-me-please',
+      CORS_ORIGIN: 'http://localhost:5173',
+    }
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(4000),
-  DATABASE_URL: z.string().url().default('postgresql://postgres:postgres@localhost:5432/milletsnow'),
-  JWT_SECRET: z.string().min(16).default('development-only-change-me-please'),
+  DATABASE_URL: z.string().url(),
+  JWT_SECRET: z.string().min(16),
   JWT_EXPIRES_IN: z.string().default('1d'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   PUBLIC_APP_URL: z.string().url().optional(),
@@ -19,4 +28,4 @@ const envSchema = z.object({
   ADMIN_PASSWORD: z.string().min(12).optional(),
 })
 
-export const env = envSchema.parse(process.env)
+export const env = envSchema.parse({ ...developmentDefaults, ...process.env })

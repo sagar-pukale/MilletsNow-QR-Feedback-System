@@ -2,8 +2,8 @@ import { app } from './app.js'
 import { env } from './config/env.js'
 import { logger } from './utils/logger.js'
 
-const server = app.listen(env.PORT, () => {
-  logger.info(`MilletsNow backend listening on port ${env.PORT}`)
+const server = app.listen(env.PORT, '0.0.0.0', () => {
+  logger.info(`MilletsNow backend listening on 0.0.0.0:${env.PORT}`)
 })
 
 const shutdown = (signal: string) => {
