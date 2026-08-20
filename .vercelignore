@@ -1,0 +1,6 @@
+.tmp
+.vercel-deploy-src
+scan-390.png
+scan-live-390.png
+tmp-backend-*.log
+tmp-local-backend-*.log

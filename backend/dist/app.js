@@ -20,7 +20,6 @@ import { analyticsRoutes } from './routes/analytics-routes.js';
 import { qrStickerTemplateRoutes } from './routes/qr-sticker-template-routes.js';
 import { getFrontendDistDir, getUploadRootDir } from './utils/upload-paths.js';
 export const app = express();
-const workspaceRoot = existsSync(path.resolve(process.cwd(), 'frontend')) ? process.cwd() : path.resolve(process.cwd(), '..');
 const frontendDistDir = getFrontendDistDir();
 const hasFrontendBuild = existsSync(frontendDistDir);
 app.disable('x-powered-by');
@@ -35,7 +34,7 @@ app.use(cors({
             origin.includes('127.0.0.1')) {
             return callback(null, true);
         }
-        return callback(null, true);
+        return callback(new Error('Origin not allowed by CORS'));
     },
     credentials: true,
 }));

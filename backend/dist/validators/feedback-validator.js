@@ -7,6 +7,7 @@ const optionalTrimmedString = z
 export const feedbackSchema = z
     .object({
     type: z.enum(['feedback', 'compliment', 'complaint', 'question']),
+    source: z.enum(['product_qr', 'common_qr']).optional(),
     rating: z.coerce.number().int().min(1).max(5).optional(),
     message: optionalTrimmedString,
     name: optionalTrimmedString,
@@ -16,11 +17,19 @@ export const feedbackSchema = z
         .email()
         .optional()
         .or(z.literal('').transform(() => undefined)),
-    qrToken: z.string().trim().min(1),
+    qrToken: z.string().trim().min(1).optional(),
     quality: optionalTrimmedString,
     category: optionalTrimmedString,
 })
     .superRefine((value, context) => {
+    const isCommonQr = value.source === 'common_qr';
+    if (!isCommonQr && !value.qrToken) {
+        context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['qrToken'],
+            message: 'QR token is required.',
+        });
+    }
     if ((value.type === 'feedback' || value.type === 'compliment') && !value.rating) {
         context.addIssue({
             code: z.ZodIssueCode.custom,
@@ -28,7 +37,7 @@ export const feedbackSchema = z
             message: 'Rating is required.',
         });
     }
-    if (value.type === 'feedback' && !value.quality) {
+    if (value.type === 'feedback' && !isCommonQr && !value.quality) {
         context.addIssue({
             code: z.ZodIssueCode.custom,
             path: ['quality'],

@@ -1,5 +1,11 @@
 import { qrCodeService } from '../services/qrcode-service.js';
 export const qrCodeController = {
+    async common(_request, response, next) { try {
+        response.json(await qrCodeService.getCommonQr());
+    }
+    catch (error) {
+        next(error);
+    } },
     async list(request, response, next) { try {
         response.json(await qrCodeService.list(request.query));
     }

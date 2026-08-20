@@ -18,8 +18,14 @@ const publicAppUrl = (env.PUBLIC_APP_URL ?? env.CORS_ORIGIN).replace(/\/+$/, '')
 function publicScanUrl(token) {
     return `${publicAppUrl}/scan/${encodeURIComponent(token)}`;
 }
+function publicCommonScanUrl() {
+    return `${publicAppUrl}/scan`;
+}
 function imageFor(token) {
     return QRCode.toDataURL(publicScanUrl(token), { margin: 1, width: 180 });
+}
+function commonImage() {
+    return QRCode.toDataURL(publicCommonScanUrl(), { margin: 1, width: 220 });
 }
 async function present(record) {
     const lastScan = record.scanLogs[0]?.scannedAt ?? null;
@@ -49,6 +55,16 @@ async function present(record) {
     };
 }
 export const qrCodeService = {
+    async getCommonQr() {
+        return {
+            id: 'common-qr',
+            label: 'Common QR',
+            qrToken: 'COMMON_QR',
+            qrImage: await commonImage(),
+            destinationUrl: publicCommonScanUrl(),
+            source: 'common_qr',
+        };
+    },
     async list(query) {
         const page = Math.max(1, Number(query.page) || 1);
         const limit = Math.min(100, Math.max(1, Number(query.limit) || 10));

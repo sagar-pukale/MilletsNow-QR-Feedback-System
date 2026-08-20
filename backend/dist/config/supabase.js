@@ -1,22 +1,32 @@
 import { createClient } from '@supabase/supabase-js';
 import { env } from './env.js';
-const supabaseUrl = env.SUPABASE_URL ??
-    process.env.VITE_SUPABASE_URL ??
-    'https://pezmxujnnwarhbgvutal.supabase.co';
-const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY ??
-    env.SUPABASE_PUBLISHABLE_KEY ??
-    env.SUPABASE_ANON_KEY ??
-    process.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
-    process.env.VITE_SUPABASE_ANON_KEY ??
-    'sb_publishable_qf_9nzMYMH4IN10b0IA0kA_1uyI4O13';
 export const supabaseStorageBucket = env.SUPABASE_STORAGE_BUCKET;
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-    auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-    },
-});
+let supabaseClient = null;
+function getServerSupabaseConfig() {
+    if (!env.SUPABASE_URL) {
+        throw new Error('SUPABASE_URL is required for backend Supabase operations.');
+    }
+    if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+        throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for backend Supabase operations.');
+    }
+    return {
+        supabaseUrl: env.SUPABASE_URL,
+        supabaseServiceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
+    };
+}
+export function getSupabaseClient() {
+    if (supabaseClient)
+        return supabaseClient;
+    const { supabaseUrl, supabaseServiceRoleKey } = getServerSupabaseConfig();
+    supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+        auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+        },
+    });
+    return supabaseClient;
+}
 export function getSupabaseStoragePublicUrl(path) {
-    const { data } = supabase.storage.from(supabaseStorageBucket).getPublicUrl(path);
+    const { data } = getSupabaseClient().storage.from(supabaseStorageBucket).getPublicUrl(path);
     return data.publicUrl;
 }

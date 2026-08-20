@@ -1,0 +1,65 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "frontend/dist",
+  "framework": "vite",
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "{backend/vercel-dist/**,backend/node_modules/.prisma/**,backend/node_modules/@prisma/**}"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/auth/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/auth",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/health",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/products/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/qrcodes/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/feedback/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/feedback",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/complaint/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/complaint",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/compliment/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/compliment",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/((?!api/|auth/|auth$|health$|products/|qrcodes/|feedback/|complaint/|compliment/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

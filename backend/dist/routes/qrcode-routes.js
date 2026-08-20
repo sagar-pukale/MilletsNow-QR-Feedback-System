@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { qrCodeController } from '../controllers/qrcode-controller.js';
 export const qrCodeRoutes = Router();
+qrCodeRoutes.get('/common', qrCodeController.common);
 qrCodeRoutes.get('/', qrCodeController.list);
 qrCodeRoutes.get('/download', qrCodeController.download);
 qrCodeRoutes.get('/print', qrCodeController.print);
