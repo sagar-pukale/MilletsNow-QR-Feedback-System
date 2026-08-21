@@ -1,5 +1,19 @@
-import 'dotenv/config'
+import { existsSync } from 'node:fs'
+import path from 'node:path'
+import { config as loadDotenv } from 'dotenv'
 import { z } from 'zod'
+
+const envCandidates = [
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(process.cwd(), '..', '.env'),
+]
+
+for (const candidate of envCandidates) {
+  if (existsSync(candidate)) {
+    loadDotenv({ path: candidate, override: false })
+    break
+  }
+}
 
 const isProduction = process.env.NODE_ENV === 'production'
 const developmentDefaults = isProduction

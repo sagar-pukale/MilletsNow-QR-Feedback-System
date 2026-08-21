@@ -52,7 +52,9 @@ function MessagesPage() {
 
   useEffect(() => {
     let active = true
-    let refreshTimer: number | undefined
+    const refreshTimer = window.setInterval(() => {
+      void fetchFeedback()
+    }, 30000)
 
     const fetchFeedback = async () => {
       try {
@@ -79,13 +81,10 @@ function MessagesPage() {
     }
 
     void fetchFeedback()
-    refreshTimer = window.setInterval(() => {
-      void fetchFeedback()
-    }, 30000)
 
     return () => {
       active = false
-      if (refreshTimer) window.clearInterval(refreshTimer)
+      window.clearInterval(refreshTimer)
     }
   }, [])
 

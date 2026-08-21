@@ -1,8 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
-$backendDir = Join-Path $root 'backend'
-$envPath = Join-Path $backendDir '.env'
+$envPath = Join-Path $root '.env'
 $statusPath = Join-Path $root '.postgres-setup-status.json'
 $psql = 'C:\Program Files\PostgreSQL\18\bin\psql.exe'
 $createdb = 'C:\Program Files\PostgreSQL\18\bin\createdb.exe'
@@ -91,7 +90,7 @@ try {
     hasAdminEmail = [bool]$envMap.Contains('ADMIN_EMAIL')
     hasAdminPassword = [bool]$envMap.Contains('ADMIN_PASSWORD')
   }
-  Write-Status -success $true -message 'PostgreSQL password accepted and backend/.env updated.' -details $details
+  Write-Status -success $true -message 'PostgreSQL password accepted and .env updated.' -details $details
   Write-Host 'PostgreSQL setup completed. You can close this window.'
 }
 catch {

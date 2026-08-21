@@ -8,7 +8,9 @@ function getDatasourceUrl() {
     const url = new URL(rawUrl)
     if (!url.hostname.includes('pooler.supabase.com')) return rawUrl
 
-    if (!url.searchParams.has('pgbouncer')) {
+    const isTransactionPooler = url.port === '6543'
+
+    if (isTransactionPooler && !url.searchParams.has('pgbouncer')) {
       url.searchParams.set('pgbouncer', 'true')
     }
 

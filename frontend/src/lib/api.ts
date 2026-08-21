@@ -1,11 +1,9 @@
-const productionApiFallback = 'https://milletsnow-qr-feedback-system.onrender.com'
-
 function normalizeBaseUrl(value?: string) {
   return (value ?? '').trim().replace(/\/+$/, '')
 }
 
 const configuredApiUrl = normalizeBaseUrl(import.meta.env.VITE_API_URL)
-const resolvedApiUrl = configuredApiUrl || (import.meta.env.PROD ? productionApiFallback : '')
+const resolvedApiUrl = configuredApiUrl
 const configuredAppUrl = normalizeBaseUrl(import.meta.env.VITE_APP_URL)
 
 function browserOrigin() {
@@ -25,7 +23,8 @@ export function apiPath(path: string) {
 export function assetUrl(value?: string | null) {
   if (!value) return ''
   if (value.startsWith('http') || value.startsWith('data:')) return value
-  return `${resolvedApiUrl}/${value.replace(/^\/+/, '')}`
+  const normalized = value.replace(/^\/+/, '')
+  return resolvedApiUrl ? `${resolvedApiUrl}/${normalized}` : `/${normalized}`
 }
 
 export function appPath(path: string) {

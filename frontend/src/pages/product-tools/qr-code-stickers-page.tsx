@@ -112,15 +112,19 @@ function QrCodeStickersPage() {
 
   useEffect(() => {
     let active = true
-    void loadData()
-      .catch((reason: unknown) => {
-        if (active) setError(reason instanceof Error ? reason.message : 'Unable to load QR code stickers.')
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
+    const timer = window.setTimeout(() => {
+      void loadData()
+        .catch((reason: unknown) => {
+          if (active) setError(reason instanceof Error ? reason.message : 'Unable to load QR code stickers.')
+        })
+        .finally(() => {
+          if (active) setLoading(false)
+        })
+    }, 0)
+
     return () => {
       active = false
+      window.clearTimeout(timer)
     }
   }, [])
 

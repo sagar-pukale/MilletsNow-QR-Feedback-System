@@ -1,15 +1,15 @@
 # test_api.ps1
 $baseUrl = "http://localhost:4000"
 $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-$backendEnvPath = Join-Path $PSScriptRoot "backend/.env"
+$envPath = Join-Path $PSScriptRoot ".env"
 
-if (-not (Test-Path $backendEnvPath)) {
-    throw "Missing backend/.env"
+if (-not (Test-Path $envPath)) {
+    throw "Missing .env"
 }
 
-$adminPasswordLine = Get-Content $backendEnvPath | Where-Object { $_ -match '^ADMIN_PASSWORD=' } | Select-Object -First 1
+$adminPasswordLine = Get-Content $envPath | Where-Object { $_ -match '^ADMIN_PASSWORD=' } | Select-Object -First 1
 if (-not $adminPasswordLine) {
-    throw "ADMIN_PASSWORD is not configured in backend/.env"
+    throw "ADMIN_PASSWORD is not configured in .env"
 }
 
 $adminPassword = $adminPasswordLine.Substring('ADMIN_PASSWORD='.Length).Trim()

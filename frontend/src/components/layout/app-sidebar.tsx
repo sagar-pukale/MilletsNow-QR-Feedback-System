@@ -19,7 +19,7 @@ const sidebarDestinations: Record<Exclude<SidebarItemId, 'logout'>, string> = {
   qrcodes: '/qrcodes',
 }
 
-function getActiveSidebarItem(pathname: string, _hash: string): SidebarItemId {
+function getActiveSidebarItem(pathname: string): SidebarItemId {
   if (pathname === '/dashboard') return 'dashboard'
   if (pathname.startsWith('/messages')) return 'messages'
   if (pathname.startsWith('/qrcodes')) return 'qrcodes'
@@ -38,7 +38,7 @@ function AppSidebar({ className, mobileOpen: mobileOpenProp, onMobileOpenChange,
   const [internalMobileOpen, setInternalMobileOpen] = useState(false)
 
   const mobileOpen = mobileOpenProp ?? internalMobileOpen
-  const activeItem = useMemo(() => getActiveSidebarItem(location.pathname, location.hash), [location.hash, location.pathname])
+  const activeItem = useMemo(() => getActiveSidebarItem(location.pathname), [location.pathname])
 
   const setMobileOpen = (nextOpen: boolean) => {
     if (mobileOpenProp === undefined) setInternalMobileOpen(nextOpen)

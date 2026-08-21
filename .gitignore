@@ -13,12 +13,6 @@ frontend/*.tsbuildinfo
 .env
 .env.*
 !.env.example
-backend/.env
-backend/.env.*
-!backend/.env.example
-frontend/.env
-frontend/.env.*
-!frontend/.env.example
 
 # Logs & temp files
 *.log
@@ -28,7 +22,6 @@ tmp-backend-*.log
 Thumbs.db
 
 .vercel
-.env*
 
 .tmp/
 .vercel-deploy-src/

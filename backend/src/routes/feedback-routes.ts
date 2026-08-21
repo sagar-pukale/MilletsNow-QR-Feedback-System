@@ -2,16 +2,24 @@ import type { NextFunction, Request, Response } from 'express'
 import { Router } from 'express'
 import multer from 'multer'
 import { createHash } from 'node:crypto'
-import path from 'node:path'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../config/prisma.js'
 import { requireAuth } from '../middleware/auth.js'
+import { FeedbackImageError, uploadFeedbackImage } from '../services/feedback-image-service.js'
 import { feedbackSchema } from '../validators/feedback-validator.js'
-import { getUploadRootDir } from '../utils/upload-paths.js'
 
 export const feedbackRoutes = Router()
-const upload = multer({ dest: path.join(getUploadRootDir(), 'feedback') })
-const toPublicUploadPath = (value?: string) => (value ? `/uploads/feedback/${path.basename(value)}` : null)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_request, file, callback) => {
+    if (['image/png', 'image/jpeg', 'image/webp'].includes(file.mimetype)) {
+      callback(null, true)
+      return
+    }
+    callback(new FeedbackImageError('Only PNG, JPG, JPEG, and WEBP images are allowed.', 400))
+  },
+})
 const duplicateSubmissionWindowMs = 10_000
 const duplicateSubmissionCache = new Map<string, { feedbackId: string; status: string; expiresAt: number }>()
 
@@ -60,11 +68,13 @@ async function submitFeedback(request: UploadRequest, response: Response, next: 
       })
     }
 
+    const imageUrl = await uploadFeedbackImage(request.file)
+
     const created = await prisma.feedback.create({
       data: {
         rating: input.rating,
         message: input.message ?? null,
-        imageUrl: toPublicUploadPath(request.file?.path),
+        imageUrl,
         quality: input.quality ?? null,
         category: input.category ?? null,
         status: 'new',
@@ -101,7 +111,20 @@ async function submitFeedback(request: UploadRequest, response: Response, next: 
   }
 }
 
-feedbackRoutes.post('/', upload.single('image'), submitFeedback)
+function handleFeedbackUpload(fieldName: string) {
+  const middleware = upload.single(fieldName)
+  return (request: Parameters<typeof middleware>[0], response: Parameters<typeof middleware>[1], next: Parameters<typeof middleware>[2]) => {
+    middleware(request, response, (error) => {
+      if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+        next(new FeedbackImageError('Feedback image must be 10 MB or smaller.', 400))
+        return
+      }
+      next(error)
+    })
+  }
+}
+
+feedbackRoutes.post('/', handleFeedbackUpload('image'), submitFeedback)
 
 feedbackRoutes.get('/', requireAuth, async (request, response, next) => {
   try {

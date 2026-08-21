@@ -104,7 +104,11 @@ function DashboardPage() {
   }
 
   useEffect(() => {
-    void loadDashboard('initial')
+    const timer = window.setTimeout(() => {
+      void loadDashboard('initial')
+    }, 0)
+
+    return () => window.clearTimeout(timer)
   }, [])
 
   const filteredSummary = useMemo(() => {

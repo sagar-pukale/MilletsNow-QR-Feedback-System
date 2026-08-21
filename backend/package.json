@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "prisma": {
+    "schema": "src/prisma/schema.prisma",
+    "seed": "tsx src/prisma/seed.ts"
+  },
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "postinstall": "prisma generate --schema src/prisma/schema.prisma",
