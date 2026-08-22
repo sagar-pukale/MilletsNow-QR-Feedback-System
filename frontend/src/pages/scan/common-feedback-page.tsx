@@ -6,6 +6,7 @@ import milletsProductsImage from '@/assets/products/millets-products.png'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { socialLinks } from '@/constants/social-links'
+import { collectFeedbackLocation } from '@/lib/feedback-submission-metadata'
 import { cn } from '@/lib/utils'
 import { CustomerPageShell } from './scan-shared'
 
@@ -21,6 +22,7 @@ function CommonFeedbackPage() {
   const [message, setMessage] = useState('')
   const [errors, setErrors] = useState<Errors>({})
   const [submitting, setSubmitting] = useState(false)
+  const [locationNotice, setLocationNotice] = useState('We request your location once during submission for feedback and admin analytics. You can deny it and your feedback will still be submitted.')
 
   const submit = async () => {
     const nextErrors: Errors = {}
@@ -30,6 +32,15 @@ function CommonFeedbackPage() {
 
     setSubmitting(true)
     try {
+      const location = await collectFeedbackLocation()
+      if (location.status === 'granted') {
+        setLocationNotice('Location captured for this feedback submission.')
+      } else if (location.status === 'denied') {
+        setLocationNotice('Location permission was denied. Feedback will be submitted without location.')
+      } else {
+        setLocationNotice('Location was unavailable on this device. Feedback will be submitted without location.')
+      }
+
       const response = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -38,6 +49,7 @@ function CommonFeedbackPage() {
           source: 'common_qr',
           rating,
           message: message.trim() || undefined,
+          ...location.payload,
         }),
       })
       const body = (await response.json().catch(() => null)) as { error?: string; details?: Record<string, string[]> } | null
@@ -118,6 +130,7 @@ function CommonFeedbackPage() {
             </div>
 
             {errors.form ? <p className="mt-3 text-sm text-destructive">{errors.form}</p> : null}
+            <p className="mt-3 text-xs leading-5 text-[#61757d]">{locationNotice}</p>
 
             <Button
               type="button"

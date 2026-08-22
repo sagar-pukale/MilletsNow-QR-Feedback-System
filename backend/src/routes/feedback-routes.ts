@@ -4,8 +4,9 @@ import multer from 'multer'
 import { createHash } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../config/prisma.js'
-import { requireAuth } from '../middleware/auth.js'
+import { attachOptionalAuth, requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { FeedbackImageError, uploadFeedbackImage } from '../services/feedback-image-service.js'
+import { parseUserAgent, sanitizeAccuracy, sanitizeCoordinate } from '../services/feedback-submission-metadata-service.js'
 import { feedbackSchema } from '../validators/feedback-validator.js'
 
 export const feedbackRoutes = Router()
@@ -32,7 +33,7 @@ type FeedbackWithProduct = Prisma.FeedbackGetPayload<{
   }
 }>
 
-type UploadRequest = Request & { file?: Express.Multer.File }
+type UploadRequest = AuthRequest & { file?: Express.Multer.File }
 
 async function submitFeedback(request: UploadRequest, response: Response, next: NextFunction) {
   try {
@@ -69,14 +70,37 @@ async function submitFeedback(request: UploadRequest, response: Response, next: 
     }
 
     const imageUrl = await uploadFeedbackImage(request.file)
+    const submittedAt = new Date()
+    const userAgent = request.get('user-agent') ?? null
+    const parsedUserAgent = parseUserAgent(userAgent)
+    const resolvedEmail = request.user?.email ?? input.email ?? null
+    const resolvedName = (request.user?.fullName?.trim() || input.name) ?? null
+    const latitude = sanitizeCoordinate(input.latitude)
+    const longitude = sanitizeCoordinate(input.longitude)
+    const locationAccuracy = sanitizeAccuracy(input.locationAccuracy)
+    const customerId = await resolveCustomerId({
+      email: resolvedEmail,
+      fullName: resolvedName,
+    })
 
     const created = await prisma.feedback.create({
       data: {
+        customerId,
+        email: resolvedEmail,
         rating: input.rating,
         message: input.message ?? null,
         imageUrl,
         quality: input.quality ?? null,
         category: input.category ?? null,
+        latitude,
+        longitude,
+        locationAccuracy,
+        locationAddress: null,
+        submittedAt,
+        userAgent,
+        deviceType: parsedUserAgent.deviceType,
+        operatingSystem: parsedUserAgent.operatingSystem,
+        browser: parsedUserAgent.browser,
         status: 'new',
         source,
         ...(qr ? { productId: qr.productId, batchId: qr.batchId, qrCodeId: qr.id } : {}),
@@ -124,7 +148,7 @@ function handleFeedbackUpload(fieldName: string) {
   }
 }
 
-feedbackRoutes.post('/', handleFeedbackUpload('image'), submitFeedback)
+feedbackRoutes.post('/', attachOptionalAuth, handleFeedbackUpload('image'), submitFeedback)
 
 feedbackRoutes.get('/', requireAuth, async (request, response, next) => {
   try {
@@ -142,6 +166,16 @@ feedbackRoutes.get('/', requireAuth, async (request, response, next) => {
       status: string
       source: string
       submitted_at: Date
+      email: string | null
+      customer_name: string | null
+      latitude: number | null
+      longitude: number | null
+      location_accuracy: number | null
+      location_address: string | null
+      user_agent: string | null
+      device_type: string | null
+      operating_system: string | null
+      browser: string | null
       product_name: string | null
       type: string
     }
@@ -150,6 +184,9 @@ feedbackRoutes.get('/', requireAuth, async (request, response, next) => {
       total: bigint | number
       average_rating: number | null
       common_qr_total?: bigint | number
+      with_location?: bigint | number
+      without_location?: bigint | number
+      today_total?: bigint | number
     }
 
     type DistributionRow = {
@@ -157,7 +194,7 @@ feedbackRoutes.get('/', requireAuth, async (request, response, next) => {
       count: bigint | number
     }
 
-    const [items, totalRow, summaryRow, commonQrRow, distributionRows] = await Promise.all([
+    const [items, totalRow, summaryRow, commonQrRow, locationSummaryRow, distributionRows] = await Promise.all([
       prisma.$queryRawUnsafe<FeedbackRow[]>(`
         SELECT
           f.id,
@@ -169,6 +206,16 @@ feedbackRoutes.get('/', requireAuth, async (request, response, next) => {
           f.status::text AS status,
           f.source,
           f.submitted_at,
+          f.email,
+          customer.full_name AS customer_name,
+          f.latitude,
+          f.longitude,
+          f.location_accuracy,
+          f.location_address,
+          f.user_agent,
+          f.device_type,
+          f.operating_system,
+          f.browser,
           p.name AS product_name,
           CASE
             WHEN q.feedback_id IS NOT NULL THEN 'question'
@@ -178,6 +225,7 @@ feedbackRoutes.get('/', requireAuth, async (request, response, next) => {
           END AS type
         FROM feedback f
         LEFT JOIN products p ON p.id = f.product_id
+        LEFT JOIN customers customer ON customer.id = f.customer_id
         LEFT JOIN questions q ON q.feedback_id = f.id
         LEFT JOIN compliments c ON c.feedback_id = f.id
         LEFT JOIN complaints cp ON cp.feedback_id = f.id
@@ -198,6 +246,16 @@ feedbackRoutes.get('/', requireAuth, async (request, response, next) => {
         FROM feedback
         WHERE source = 'common_qr'
       `),
+      prisma.$queryRawUnsafe<SummaryRow[]>(`
+        SELECT
+          COUNT(*) FILTER (WHERE latitude IS NOT NULL AND longitude IS NOT NULL) AS with_location,
+          COUNT(*) FILTER (WHERE latitude IS NULL OR longitude IS NULL) AS without_location,
+          COUNT(*) FILTER (
+            WHERE submitted_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Kolkata') AT TIME ZONE 'Asia/Kolkata'
+              AND submitted_at < (date_trunc('day', now() AT TIME ZONE 'Asia/Kolkata') + interval '1 day') AT TIME ZONE 'Asia/Kolkata'
+          ) AS today_total
+        FROM feedback
+      `),
       prisma.$queryRawUnsafe<DistributionRow[]>(`
         SELECT rating, COUNT(*) AS count
         FROM feedback
@@ -211,11 +269,16 @@ feedbackRoutes.get('/', requireAuth, async (request, response, next) => {
     const ratedTotal = Number(summaryRow[0]?.total ?? 0)
     const averageRating = summaryRow[0]?.average_rating != null ? Number(summaryRow[0].average_rating) : null
     const commonQrTotal = Number(commonQrRow[0]?.common_qr_total ?? 0)
+    const withLocation = Number(locationSummaryRow[0]?.with_location ?? 0)
+    const withoutLocation = Number(locationSummaryRow[0]?.without_location ?? 0)
+    const todayTotal = Number(locationSummaryRow[0]?.today_total ?? 0)
     const distributionMap = new Map(distributionRows.map((row) => [row.rating, Number(row.count)]))
 
     response.json({
       items: items.map((f) => ({
         id: f.id,
+        name: f.customer_name,
+        email: f.email,
         rating: f.rating,
         message: f.message,
         imageUrl: f.image_url,
@@ -224,6 +287,14 @@ feedbackRoutes.get('/', requireAuth, async (request, response, next) => {
         status: f.status,
         submittedAt: f.submitted_at,
         source: f.source,
+        latitude: f.latitude,
+        longitude: f.longitude,
+        locationAccuracy: f.location_accuracy,
+        locationAddress: f.location_address,
+        userAgent: f.user_agent,
+        deviceType: f.device_type,
+        operatingSystem: f.operating_system,
+        browser: f.browser,
         productName: f.product_name,
         sourceLabel: f.source === 'common_qr' ? 'Common QR' : f.product_name,
         type: f.type,
@@ -232,6 +303,9 @@ feedbackRoutes.get('/', requireAuth, async (request, response, next) => {
         total,
         totalRatings: ratedTotal,
         commonQrTotal,
+        withLocation,
+        withoutLocation,
+        todayTotal,
         averageRating,
         ratingDistribution: [5, 4, 3, 2, 1].map((rating) => ({
           rating,
@@ -244,6 +318,48 @@ feedbackRoutes.get('/', requireAuth, async (request, response, next) => {
     next(error)
   }
 })
+
+async function resolveCustomerId(input: { email: string | null; fullName: string | null }) {
+  if (!input.email && !input.fullName) return null
+
+  if (input.email) {
+    const existing = await prisma.customer.findFirst({
+      where: { email: input.email },
+      select: { id: true, fullName: true },
+      orderBy: { createdAt: 'asc' },
+    })
+
+    if (existing) {
+      if (input.fullName && existing.fullName !== input.fullName) {
+        await prisma.customer.update({
+          where: { id: existing.id },
+          data: { fullName: existing.fullName ?? input.fullName },
+        })
+      }
+      return existing.id
+    }
+  }
+
+  if (input.fullName) {
+    const existing = await prisma.customer.findFirst({
+      where: { fullName: input.fullName, email: null },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    })
+
+    if (existing) return existing.id
+  }
+
+  const created = await prisma.customer.create({
+    data: {
+      email: input.email,
+      fullName: input.fullName,
+    },
+    select: { id: true },
+  })
+
+  return created.id
+}
 
 function resolveSubmissionType(baseUrl: string, submittedType: unknown) {
   if (typeof submittedType === 'string' && submittedType.length) {

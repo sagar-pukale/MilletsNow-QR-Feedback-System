@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken'
 import { env } from '../config/env.js'
 import { prisma } from '../config/prisma.js'
 
-export type AuthUser = { id: string; email: string; role: string }
+export type AuthUser = { id: string; email: string; fullName: string; role: string }
 export type AuthRequest = Request & { user?: AuthUser }
 export const authCookie = 'milletsnow_session'
 
@@ -14,20 +14,29 @@ export function readToken(request: Request) {
 }
 
 export async function requireAuth(request: AuthRequest, response: Response, next: NextFunction) {
+  const user = await resolveAuthenticatedUser(request)
+  if (!user) return response.status(401).json({ error: 'Authentication required' })
+  request.user = user
+  next()
+}
+
+export async function attachOptionalAuth(request: AuthRequest, _response: Response, next: NextFunction) {
+  request.user = (await resolveAuthenticatedUser(request)) ?? undefined
+  next()
+}
+
+async function resolveAuthenticatedUser(request: Request) {
   const token = readToken(request)
-  if (!token) return response.status(401).json({ error: 'Authentication required' })
+  if (!token) return null
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET) as AuthUser
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, email: true, role: true, status: true },
+      select: { id: true, email: true, fullName: true, role: true, status: true },
     })
-    if (!user || user.status !== 'active') {
-      return response.status(401).json({ error: 'Account is not authorized for this action' })
-    }
-    request.user = { id: user.id, email: user.email, role: user.role }
-    next()
+    if (!user || user.status !== 'active') return null
+    return { id: user.id, email: user.email, fullName: user.fullName, role: user.role }
   } catch {
-    response.status(401).json({ error: 'Invalid or expired session' })
+    return null
   }
 }

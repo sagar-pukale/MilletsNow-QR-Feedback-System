@@ -46,6 +46,14 @@ enum FeedbackStatus {
   @@map("feedback_status")
 }
 
+enum FeedbackPriority {
+  low
+  medium
+  high
+  urgent
+  @@map("feedback_priority")
+}
+
 enum QRCodeStatus {
   active
   paused
@@ -183,29 +191,42 @@ model QRScanLog {
 }
 
 model Feedback {
-  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  customerId  String?        @map("customer_id") @db.Uuid
-  productId   String?        @map("product_id") @db.Uuid
-  batchId     String?        @map("batch_id") @db.Uuid
-  qrCodeId    String?        @map("qr_code_id") @db.Uuid
-  assignedTo  String?        @map("assigned_to") @db.Uuid
-  source      String         @default("product_qr")
-  rating      Int?
-  message     String?
-  imageUrl    String?        @map("image_url")
-  quality     String?        @map("quality")
-  category    String?        @map("category")
-  status      FeedbackStatus @default(new)
-  submittedAt DateTime       @default(now()) @map("submitted_at")
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @default(now()) @updatedAt @map("updated_at")
-  customer    Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  product     Product?       @relation(fields: [productId], references: [id], onDelete: SetNull)
-  batch       ProductBatch?  @relation(fields: [batchId], references: [id], onDelete: SetNull)
-  qrCode      QRCode?        @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
-  question    Question?
-  compliment  Compliment?
-  complaint   Complaint?
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId     String?          @map("customer_id") @db.Uuid
+  productId      String?          @map("product_id") @db.Uuid
+  batchId        String?          @map("batch_id") @db.Uuid
+  qrCodeId       String?          @map("qr_code_id") @db.Uuid
+  assignedTo     String?          @map("assigned_to") @db.Uuid
+  source         String           @default("product_qr")
+  email          String?
+  rating         Int?
+  message        String?
+  imageUrl       String?          @map("image_url")
+  quality        String?          @map("quality")
+  category       String?          @map("category")
+  latitude       Float?           @db.DoublePrecision
+  longitude      Float?           @db.DoublePrecision
+  locationAccuracy Float?         @map("location_accuracy") @db.DoublePrecision
+  locationAddress String?         @map("location_address")
+  userAgent      String?          @map("user_agent")
+  deviceType     String?          @map("device_type")
+  operatingSystem String?         @map("operating_system")
+  browser        String?
+  status         FeedbackStatus   @default(new)
+  trackingPriority FeedbackPriority @default(medium) @map("tracking_priority")
+  statusChangedAt DateTime        @default(now()) @map("status_changed_at")
+  lastActionAt   DateTime         @default(now()) @map("last_action_at")
+  resolvedAt     DateTime?        @map("resolved_at")
+  submittedAt    DateTime         @default(now()) @map("submitted_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at")
+  customer       Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  product        Product?         @relation(fields: [productId], references: [id], onDelete: SetNull)
+  batch          ProductBatch?    @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  qrCode         QRCode?          @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
+  question       Question?
+  compliment     Compliment?
+  complaint      Complaint?
   @@map("feedback")
 }
 

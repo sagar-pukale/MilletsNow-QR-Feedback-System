@@ -6,6 +6,11 @@ const optionalTrimmedString = z
   .transform((value) => (value.length ? value : undefined))
   .optional()
 
+const optionalNumber = z.preprocess((value) => {
+  if (value === '' || value == null) return undefined
+  return value
+}, z.coerce.number().finite().optional())
+
 export const feedbackSchema = z
   .object({
     type: z.enum(['feedback', 'compliment', 'complaint', 'question']),
@@ -19,6 +24,9 @@ export const feedbackSchema = z
       .email()
       .optional()
       .or(z.literal('').transform(() => undefined)),
+    latitude: optionalNumber,
+    longitude: optionalNumber,
+    locationAccuracy: optionalNumber,
     qrToken: z.string().trim().min(1).optional(),
     quality: optionalTrimmedString,
     category: optionalTrimmedString,
@@ -66,5 +74,29 @@ export const feedbackSchema = z
           message: 'Complaint description is required.',
         })
       }
+    }
+
+    if (value.latitude != null && (value.latitude < -90 || value.latitude > 90)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['latitude'],
+        message: 'Latitude must be between -90 and 90.',
+      })
+    }
+
+    if (value.longitude != null && (value.longitude < -180 || value.longitude > 180)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['longitude'],
+        message: 'Longitude must be between -180 and 180.',
+      })
+    }
+
+    if (value.locationAccuracy != null && value.locationAccuracy < 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['locationAccuracy'],
+        message: 'Location accuracy must be zero or greater.',
+      })
     }
   })

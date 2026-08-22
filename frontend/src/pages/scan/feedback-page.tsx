@@ -4,6 +4,7 @@ import { ArrowLeftIcon, ImagePlusIcon, LoaderCircleIcon, StarIcon, TriangleAlert
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { collectFeedbackLocation } from '@/lib/feedback-submission-metadata'
 import { BrandHeader, CustomerPageShell, FollowUs, ProductHero, resolveAssetUrl, type ScanPayload } from './scan-shared'
 
 type FlowType = 'feedback' | 'complaint' | 'compliment'
@@ -31,6 +32,7 @@ function FeedbackPage() {
   const [image, setImage] = useState<File | null>(null)
   const [errors, setErrors] = useState<Errors>({})
   const [submitting, setSubmitting] = useState(false)
+  const [locationNotice, setLocationNotice] = useState('We request your location once during submission for feedback and admin analytics. You can deny it and your feedback will still be submitted.')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -109,6 +111,18 @@ function FeedbackPage() {
     if (image) body.append('image', image)
 
     try {
+      const location = await collectFeedbackLocation()
+      if (location.status === 'granted') {
+        if (location.payload.latitude != null) body.append('latitude', String(location.payload.latitude))
+        if (location.payload.longitude != null) body.append('longitude', String(location.payload.longitude))
+        if (location.payload.locationAccuracy != null) body.append('locationAccuracy', String(location.payload.locationAccuracy))
+        setLocationNotice('Location captured for this feedback submission.')
+      } else if (location.status === 'denied') {
+        setLocationNotice('Location permission was denied. Feedback will be submitted without location.')
+      } else {
+        setLocationNotice('Location was unavailable on this device. Feedback will be submitted without location.')
+      }
+
       const response = await fetch('/api/feedback', { method: 'POST', body })
       const payloadBody = (await response.json().catch(() => null)) as { error?: string; details?: Record<string, string[]> } | null
 
@@ -289,6 +303,7 @@ function FeedbackPage() {
         ) : null}
 
         {errors.form ? <FieldError message={errors.form} className="mt-2" /> : null}
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">{locationNotice}</p>
 
         <Button type="button" size="lg" className="mt-6 h-12 w-full rounded-2xl" disabled={submitting} onClick={() => void submit()}>
           {submitting ? (

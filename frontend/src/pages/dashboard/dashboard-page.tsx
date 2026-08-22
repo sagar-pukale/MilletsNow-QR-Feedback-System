@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MessageSquareTextIcon, RefreshCwIcon, StarIcon } from 'lucide-react'
+import { MapPinIcon, MessageSquareTextIcon, RefreshCwIcon, StarIcon } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -28,6 +28,9 @@ type FeedbackResponse = {
   summary: {
     total: number
     totalRatings: number
+    withLocation: number
+    withoutLocation: number
+    todayTotal: number
     averageRating: number | null
   }
 }
@@ -130,9 +133,9 @@ function DashboardPage() {
   const overallSummary = useMemo(
     () => ({
       totalFeedback: feedbackData?.summary.total ?? '-',
-      totalRatings: feedbackData?.summary.totalRatings ?? '-',
-      averageRating:
-        feedbackData?.summary.averageRating != null ? `${feedbackData.summary.averageRating} / 5` : '—',
+      withLocation: feedbackData?.summary.withLocation ?? '-',
+      withoutLocation: feedbackData?.summary.withoutLocation ?? '-',
+      todayTotal: feedbackData?.summary.todayTotal ?? '-',
     }),
     [feedbackData],
   )
@@ -140,22 +143,28 @@ function DashboardPage() {
   const summaryCards = useMemo(
     () => [
       {
-        title: 'Feedback',
+        title: 'Total Feedback',
         value: overallSummary.totalFeedback,
         note: 'Overall total feedback received',
         icon: MessageSquareTextIcon,
       },
       {
-        title: 'Average Rating',
-        value: overallSummary.averageRating,
-        note: 'Overall average customer rating',
+        title: 'With Location',
+        value: overallSummary.withLocation,
+        note: 'Feedback entries with shared coordinates',
+        icon: MapPinIcon,
+      },
+      {
+        title: 'Without Location',
+        value: overallSummary.withoutLocation,
+        note: 'Feedback entries submitted without location',
         icon: StarIcon,
       },
       {
-        title: 'Total Ratings',
-        value: overallSummary.totalRatings,
-        note: 'Total ratings received',
-        icon: StarIcon,
+        title: 'Received Today',
+        value: overallSummary.todayTotal,
+        note: 'Feedback received today in IST',
+        icon: MessageSquareTextIcon,
       },
     ],
     [overallSummary],
@@ -190,7 +199,7 @@ function DashboardPage() {
             </div>
           ) : null}
 
-          <section className="grid gap-5 lg:grid-cols-3">
+          <section className="grid gap-5 lg:grid-cols-2 xl:grid-cols-4">
             {summaryCards.map((item) => {
               const Icon = item.icon
 

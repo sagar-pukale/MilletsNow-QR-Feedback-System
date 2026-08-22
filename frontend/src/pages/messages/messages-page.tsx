@@ -14,10 +14,20 @@ import { apiPath } from '@/lib/api'
 
 type Message = {
   id: string
+  name: string | null
+  email: string | null
   rating: number | null
   message: string | null
   status: string
   submittedAt: string
+  latitude: number | null
+  longitude: number | null
+  locationAccuracy: number | null
+  locationAddress: string | null
+  userAgent: string | null
+  deviceType: string | null
+  operatingSystem: string | null
+  browser: string | null
   productName: string | null
   source: string
   sourceLabel: string | null
@@ -28,6 +38,9 @@ type FeedbackSummary = {
   total: number
   totalRatings: number
   commonQrTotal: number
+  withLocation: number
+  withoutLocation: number
+  todayTotal: number
   averageRating: number | null
   ratingDistribution: Array<{
     rating: number
@@ -37,12 +50,20 @@ type FeedbackSummary = {
 
 type ActiveMetric = 'all' | 'total' | 'average' | 'rated' | 'common_qr'
 
+function mapLocationHref(item: Message) {
+  if (item.latitude == null || item.longitude == null) return null
+  return `https://www.google.com/maps?q=${encodeURIComponent(`${item.latitude},${item.longitude}`)}`
+}
+
 function MessagesPage() {
   const [items, setItems] = useState<Message[]>([])
   const [summary, setSummary] = useState<FeedbackSummary>({
     total: 0,
     totalRatings: 0,
     commonQrTotal: 0,
+    withLocation: 0,
+    withoutLocation: 0,
+    todayTotal: 0,
     averageRating: null,
     ratingDistribution: [5, 4, 3, 2, 1].map((rating) => ({ rating, count: 0 })),
   })
@@ -52,9 +73,6 @@ function MessagesPage() {
 
   useEffect(() => {
     let active = true
-    const refreshTimer = window.setInterval(() => {
-      void fetchFeedback()
-    }, 30000)
 
     const fetchFeedback = async () => {
       try {
@@ -81,6 +99,9 @@ function MessagesPage() {
     }
 
     void fetchFeedback()
+    const refreshTimer = window.setInterval(() => {
+      void fetchFeedback()
+    }, 30000)
 
     return () => {
       active = false
@@ -267,16 +288,48 @@ function MessagesPage() {
                       : null,
                     showContextDetails ? new Date(item.submittedAt).toLocaleString('en-IN') : null,
                   ].filter(Boolean)
+                  const mapHref = mapLocationHref(item)
 
                   return (
                     <div
                       key={item.id}
                       className="flex flex-col gap-2 p-5 sm:flex-row sm:items-start sm:justify-between"
                     >
-                      <div>
+                      <div className="max-w-4xl">
                         <p className="text-sm font-semibold text-[#20323a]">{message}</p>
+                        {(item.name || item.email) ? (
+                          <p className="mt-1 text-xs font-medium text-[#425861]">
+                            {[item.name, item.email].filter(Boolean).join(' · ')}
+                          </p>
+                        ) : null}
                         {!showTextOnly && metaParts.length > 0 ? (
                           <p className="mt-1 text-xs text-[#6c8189]">{metaParts.join(' · ')}</p>
+                        ) : null}
+                        {(item.locationAddress || mapHref || item.browser || item.deviceType || item.operatingSystem) ? (
+                          <div className="mt-2 space-y-1 text-xs text-[#6c8189]">
+                            {item.locationAddress ? <p>Location: {item.locationAddress}</p> : null}
+                            {item.latitude != null && item.longitude != null ? (
+                              <p>
+                                Coordinates: {item.latitude.toFixed(6)}, {item.longitude.toFixed(6)}
+                                {item.locationAccuracy != null ? ` · Accuracy ${Math.round(item.locationAccuracy)} m` : ''}
+                              </p>
+                            ) : null}
+                            {(item.browser || item.deviceType || item.operatingSystem) ? (
+                              <p>Device: {[item.browser, item.deviceType, item.operatingSystem].filter(Boolean).join(' · ')}</p>
+                            ) : null}
+                            {mapHref ? (
+                              <p>
+                                <a
+                                  href={mapHref}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="font-semibold text-[#2e9bb8] hover:text-[#1e88a4]"
+                                >
+                                  View Location
+                                </a>
+                              </p>
+                            ) : null}
+                          </div>
                         ) : null}
                       </div>
                       {showTypeBadge ? (
