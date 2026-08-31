@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MessageSquareIcon, QrCodeIcon, StarIcon } from 'lucide-react'
+import { DownloadIcon, MessageSquareIcon, QrCodeIcon, StarIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { EmptyState } from '@/components/common/empty-state'
 import {
@@ -10,7 +11,7 @@ import {
   PageLayout,
   PageTitle,
 } from '@/components/layout/page-layout'
-import { apiPath } from '@/lib/api'
+import { apiFetch } from '@/lib/api'
 
 type Message = {
   id: string
@@ -23,6 +24,10 @@ type Message = {
   latitude: number | null
   longitude: number | null
   locationAccuracy: number | null
+  locationLabel: string | null
+  locationLocality: string | null
+  locationDistrict: string | null
+  locationState: string | null
   locationAddress: string | null
   userAgent: string | null
   deviceType: string | null
@@ -55,6 +60,10 @@ function mapLocationHref(item: Message) {
   return `https://www.google.com/maps?q=${encodeURIComponent(`${item.latitude},${item.longitude}`)}`
 }
 
+function preferredLocationLabel(item: Message) {
+  return item.locationLabel ?? item.locationAddress
+}
+
 function MessagesPage() {
   const [items, setItems] = useState<Message[]>([])
   const [summary, setSummary] = useState<FeedbackSummary>({
@@ -70,13 +79,14 @@ function MessagesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeMetric, setActiveMetric] = useState<ActiveMetric>('all')
+  const [exportBusy, setExportBusy] = useState(false)
 
   useEffect(() => {
     let active = true
 
     const fetchFeedback = async () => {
       try {
-        const response = await fetch(apiPath('/feedback?limit=1000'), { credentials: 'include' })
+        const response = await apiFetch('/feedback?limit=1000')
         if (!response.ok) {
           throw new Error(
             response.status === 401
@@ -135,6 +145,44 @@ function MessagesPage() {
     return 'Show All'
   }, [activeMetric])
 
+  const downloadExcel = async () => {
+    if (summary.total === 0) {
+      setError('No feedback records available to export.')
+      return
+    }
+
+    setExportBusy(true)
+    setError('')
+
+    try {
+      const response = await apiFetch('/feedback/export.xlsx')
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error ?? 'Unable to export feedback to Excel.')
+      }
+
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      const reportDate = new Intl.DateTimeFormat('en-CA', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date())
+
+      link.href = downloadUrl
+      link.download = `QR_Feedback_Report_${reportDate}.xlsx`
+      document.body.append(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(downloadUrl)
+    } catch (reason: unknown) {
+      setError(reason instanceof Error ? reason.message : 'Unable to export feedback to Excel.')
+    } finally {
+      setExportBusy(false)
+    }
+  }
+
   return (
     <PageLayout className="bg-[linear-gradient(180deg,#eef8fb_0%,#f8fdfe_34%,#f6fbfd_100%)]">
       <PageContainer>
@@ -147,6 +195,10 @@ function MessagesPage() {
                 Review real feedback submissions, ratings, and common QR responses from the live MilletsNow system.
               </PageDescription>
             </PageHeading>
+            <Button type="button" variant="outline" disabled={loading || exportBusy} onClick={() => void downloadExcel()}>
+              <DownloadIcon className="size-4" />
+              {exportBusy ? 'Preparing Excel...' : 'Download Excel'}
+            </Button>
           </PageHeader>
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -289,6 +341,8 @@ function MessagesPage() {
                     showContextDetails ? new Date(item.submittedAt).toLocaleString('en-IN') : null,
                   ].filter(Boolean)
                   const mapHref = mapLocationHref(item)
+                  const locationLabel = preferredLocationLabel(item)
+                  const deviceLabel = [item.browser, item.deviceType, item.operatingSystem].filter(Boolean).join(' · ')
 
                   return (
                     <div
@@ -305,17 +359,15 @@ function MessagesPage() {
                         {!showTextOnly && metaParts.length > 0 ? (
                           <p className="mt-1 text-xs text-[#6c8189]">{metaParts.join(' · ')}</p>
                         ) : null}
-                        {(item.locationAddress || mapHref || item.browser || item.deviceType || item.operatingSystem) ? (
+                        {(locationLabel || item.latitude != null || item.longitude != null || item.locationAccuracy != null || deviceLabel || mapHref) ? (
                           <div className="mt-2 space-y-1 text-xs text-[#6c8189]">
-                            {item.locationAddress ? <p>Location: {item.locationAddress}</p> : null}
+                            {locationLabel ? <p>Location: {locationLabel}</p> : null}
+                            {item.locationAccuracy != null ? <p>Accuracy: {Math.round(item.locationAccuracy)} m</p> : null}
+                            {deviceLabel ? <p>Device: {deviceLabel}</p> : null}
                             {item.latitude != null && item.longitude != null ? (
                               <p>
                                 Coordinates: {item.latitude.toFixed(6)}, {item.longitude.toFixed(6)}
-                                {item.locationAccuracy != null ? ` · Accuracy ${Math.round(item.locationAccuracy)} m` : ''}
                               </p>
-                            ) : null}
-                            {(item.browser || item.deviceType || item.operatingSystem) ? (
-                              <p>Device: {[item.browser, item.deviceType, item.operatingSystem].filter(Boolean).join(' · ')}</p>
                             ) : null}
                             {mapHref ? (
                               <p>
