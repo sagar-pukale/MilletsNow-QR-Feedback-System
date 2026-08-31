@@ -8,7 +8,7 @@ import { useAuth, type AuthUser } from '@/context/auth-context'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { apiPath } from '@/lib/api'
+import { apiPath, clearStoredAuthToken } from '@/lib/api'
 import milletsNowLogo from '@/assets/milletsnow-logo.jpeg'
 
 const schema = z.object({
@@ -43,6 +43,7 @@ function LoginPage() {
     setServerError('')
 
     try {
+      clearStoredAuthToken()
       const response = await fetch(apiPath('/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -53,10 +54,10 @@ function LoginPage() {
         }),
       })
 
-      const body = (await response.json().catch(() => null)) as { user?: AuthUser; error?: string } | null
+      const body = (await response.json().catch(() => null)) as { user?: AuthUser; token?: string; error?: string } | null
       if (!response.ok || !body?.user) throw new Error(body?.error ?? 'Unable to sign in.')
 
-      loginSuccess(body.user)
+      loginSuccess(body.user, body.token)
       navigate(redirectTarget, { replace: true })
     } catch (reason) {
       setServerError(

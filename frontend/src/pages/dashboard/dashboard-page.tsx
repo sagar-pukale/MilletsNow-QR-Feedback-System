@@ -11,20 +11,9 @@ import {
   PageLayout,
   PageTitle,
 } from '@/components/layout/page-layout'
-import { apiPath } from '@/lib/api'
+import { apiFetch } from '@/lib/api'
 
-type FeedbackResponse = {
-  items: Array<{
-    id: string
-    rating: number | null
-    submittedAt: string
-  }>
-  pagination: {
-    page: number
-    limit: number
-    total: number
-    totalPages: number
-  }
+type FeedbackSummaryResponse = {
   summary: {
     total: number
     totalRatings: number
@@ -35,6 +24,16 @@ type FeedbackResponse = {
   }
 }
 
+type DashboardAnalyticsResponse = {
+  summary: {
+    totalMessages: number
+  }
+  ratings: {
+    total: number
+    average: number | null
+  }
+}
+
 function formatIstDateValue(date: Date) {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Kolkata',
@@ -42,15 +41,6 @@ function formatIstDateValue(date: Date) {
     month: '2-digit',
     day: '2-digit',
   }).format(date)
-}
-
-function istDayKey(value: string | Date) {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Kolkata',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(typeof value === 'string' ? new Date(value) : value)
 }
 
 function formatVisibleDate(value: string) {
@@ -67,7 +57,8 @@ function formatVisibleDate(value: string) {
 
 function DashboardPage() {
   const [searchParams] = useSearchParams()
-  const [feedbackData, setFeedbackData] = useState<FeedbackResponse | null>(null)
+  const [overallSummary, setOverallSummary] = useState<FeedbackSummaryResponse['summary'] | null>(null)
+  const [selectedDateSummary, setSelectedDateSummary] = useState<DashboardAnalyticsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
@@ -80,24 +71,20 @@ function DashboardPage() {
     setError('')
 
     try {
-      const pageSize = 100
-      const firstResponse = await fetch(apiPath(`/feedback?limit=${pageSize}&page=1`), { credentials: 'include' })
-      if (!firstResponse.ok) throw new Error('Unable to load dashboard metrics.')
+      const [overallResponse, selectedDateResponse] = await Promise.all([
+        apiFetch('/feedback?limit=1&page=1'),
+        apiFetch(`/analytics/dashboard?startDate=${selectedDate}&endDate=${selectedDate}&timeZoneOffsetMinutes=-330`),
+      ])
 
-      const firstPage = (await firstResponse.json()) as FeedbackResponse
-      const items = [...firstPage.items]
-
-      for (let page = 2; page <= firstPage.pagination.totalPages; page += 1) {
-        const nextResponse = await fetch(apiPath(`/feedback?limit=${pageSize}&page=${page}`), { credentials: 'include' })
-        if (!nextResponse.ok) throw new Error('Unable to load dashboard metrics.')
-        const nextPage = (await nextResponse.json()) as FeedbackResponse
-        items.push(...nextPage.items)
+      if (!overallResponse.ok || !selectedDateResponse.ok) {
+        throw new Error('Unable to load dashboard metrics.')
       }
 
-      setFeedbackData({
-        ...firstPage,
-        items,
-      })
+      const overallPayload = (await overallResponse.json()) as FeedbackSummaryResponse
+      const selectedDatePayload = (await selectedDateResponse.json()) as DashboardAnalyticsResponse
+
+      setOverallSummary(overallPayload.summary)
+      setSelectedDateSummary(selectedDatePayload)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to load dashboard metrics.')
     } finally {
@@ -112,57 +99,31 @@ function DashboardPage() {
     }, 0)
 
     return () => window.clearTimeout(timer)
-  }, [])
-
-  const filteredSummary = useMemo(() => {
-    const selectedItems = feedbackData?.items.filter((item) => istDayKey(item.submittedAt) === selectedDate) ?? []
-    const ratings = selectedItems
-      .map((item) => item.rating)
-      .filter((value): value is number => typeof value === 'number')
-    const totalRatings = ratings.length
-    const averageRating =
-      totalRatings > 0 ? Math.round((ratings.reduce((sum, value) => sum + value, 0) / totalRatings) * 10) / 10 : null
-
-    return {
-      totalFeedback: selectedItems.length,
-      totalRatings,
-      averageRating,
-    }
-  }, [feedbackData?.items, selectedDate])
-
-  const overallSummary = useMemo(
-    () => ({
-      totalFeedback: feedbackData?.summary.total ?? '-',
-      withLocation: feedbackData?.summary.withLocation ?? '-',
-      withoutLocation: feedbackData?.summary.withoutLocation ?? '-',
-      todayTotal: feedbackData?.summary.todayTotal ?? '-',
-    }),
-    [feedbackData],
-  )
+  }, [selectedDate])
 
   const summaryCards = useMemo(
     () => [
       {
         title: 'Total Feedback',
-        value: overallSummary.totalFeedback,
+        value: overallSummary?.total ?? '-',
         note: 'Overall total feedback received',
         icon: MessageSquareTextIcon,
       },
       {
         title: 'With Location',
-        value: overallSummary.withLocation,
+        value: overallSummary?.withLocation ?? '-',
         note: 'Feedback entries with shared coordinates',
         icon: MapPinIcon,
       },
       {
         title: 'Without Location',
-        value: overallSummary.withoutLocation,
+        value: overallSummary?.withoutLocation ?? '-',
         note: 'Feedback entries submitted without location',
         icon: StarIcon,
       },
       {
         title: 'Received Today',
-        value: overallSummary.todayTotal,
+        value: overallSummary?.todayTotal ?? '-',
         note: 'Feedback received today in IST',
         icon: MessageSquareTextIcon,
       },
@@ -244,19 +205,19 @@ function DashboardPage() {
                 {[
                   {
                     label: 'Feedback',
-                    value: loading ? '-' : filteredSummary.totalFeedback,
+                    value: loading ? '-' : selectedDateSummary?.summary.totalMessages ?? 0,
                   },
                   {
                     label: 'Average Rating',
                     value: loading
                       ? '-'
-                      : filteredSummary.averageRating != null
-                        ? `${filteredSummary.averageRating} / 5`
+                      : selectedDateSummary?.ratings.average != null
+                        ? `${selectedDateSummary.ratings.average} / 5`
                         : '—',
                   },
                   {
                     label: 'Ratings',
-                    value: loading ? '-' : filteredSummary.totalRatings,
+                    value: loading ? '-' : selectedDateSummary?.ratings.total ?? 0,
                   },
                 ].map((item) => (
                   <div

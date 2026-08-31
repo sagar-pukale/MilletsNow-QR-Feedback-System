@@ -21,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { apiPath, appPath, assetUrl } from '@/lib/api'
+import { apiFetch, appPath, assetUrl } from '@/lib/api'
 
 import type { ProductRecord } from './product-data'
 
@@ -105,7 +105,7 @@ function ProductsPage() {
   const [notice, setNotice] = useState('')
 
   const loadCatalog = async () => {
-    const response = await fetch(apiPath('/products?limit=100'), { credentials: 'include' })
+    const response = await apiFetch('/products?limit=100')
     if (!response.ok) throw new Error('Unable to load products')
 
     const body = (await response.json()) as { items: ApiProduct[] }
@@ -144,7 +144,7 @@ function ProductsPage() {
   )
 
   const fetchProduct = async (productId: string) => {
-    const response = await fetch(apiPath(`/products/${productId}`), { credentials: 'include' })
+    const response = await apiFetch(`/products/${productId}`)
     if (!response.ok) throw new Error('Unable to load product details')
     return (await response.json()) as ApiProduct
   }
@@ -183,7 +183,7 @@ function ProductsPage() {
     setError('')
 
     try {
-      const response = await fetch(apiPath(`/qrcodes?productId=${product.id}&limit=100`), { credentials: 'include' })
+      const response = await apiFetch(`/qrcodes?productId=${product.id}&limit=100`)
       if (!response.ok) throw new Error('Unable to load QR code')
 
       const body = (await response.json()) as { items: QRItem[] }
@@ -222,9 +222,8 @@ function ProductsPage() {
     }
 
     try {
-      const response = await fetch(productId ? apiPath(`/products/${productId}`) : apiPath('/products'), {
+      const response = await apiFetch(productId ? `/products/${productId}` : '/products', {
         method: productId ? 'PUT' : 'POST',
-        credentials: 'include',
         body: payload,
       })
 
@@ -251,9 +250,8 @@ function ProductsPage() {
     setError('')
 
     try {
-      const response = await fetch(apiPath(`/products/${selected.id}`), {
+      const response = await apiFetch(`/products/${selected.id}`, {
         method: 'DELETE',
-        credentials: 'include',
       })
       if (!response.ok) throw new Error('Unable to delete product')
 
@@ -577,9 +575,8 @@ function ProductForm({ busy, onOpenChange, onSave, onUploadStateChange, open: _o
       const payload = new FormData()
       payload.append('image', file)
 
-      const response = await fetch(apiPath(`/products/${product.id}/image`), {
+      const response = await apiFetch(`/products/${product.id}/image`, {
         method: 'POST',
-        credentials: 'include',
         body: payload,
       })
 

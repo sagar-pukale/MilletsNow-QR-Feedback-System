@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/common/empty-state'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageContainer, PageDescription, PageHeader, PageHeading, PageLayout, PageTitle } from '@/components/layout/page-layout'
-import { apiPath, assetUrl } from '@/lib/api'
+import { apiFetch, assetUrl } from '@/lib/api'
 
 type ProductDetails = {
   id: string
@@ -32,7 +32,7 @@ function ProductDetailsPage() {
 
     const load = async () => {
       try {
-        const response = await fetch(apiPath(`/products/${id}`), { credentials: 'include' })
+        const response = await apiFetch(`/products/${id}`)
         if (!response.ok) throw new Error('Unable to load product details.')
         const body = (await response.json()) as ProductDetails
         if (active) setProduct(body)

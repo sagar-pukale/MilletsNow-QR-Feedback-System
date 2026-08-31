@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import { env } from '../config/env.js'
 import { prisma } from '../config/prisma.js'
+import { logger } from '../utils/logger.js'
 
 export type AuthUser = { id: string; email: string; fullName: string; role: string }
 export type AuthRequest = Request & { user?: AuthUser }
@@ -15,7 +16,16 @@ export function readToken(request: Request) {
 
 export async function requireAuth(request: AuthRequest, response: Response, next: NextFunction) {
   const user = await resolveAuthenticatedUser(request)
-  if (!user) return response.status(401).json({ error: 'Authentication required' })
+  if (!user) {
+    logger.info('Authentication required', {
+      method: request.method,
+      path: request.originalUrl,
+      origin: request.headers.origin ?? null,
+      hasAuthorization: Boolean(request.headers.authorization),
+      hasCookie: Boolean(request.headers.cookie),
+    })
+    return response.status(401).json({ error: 'Authentication required' })
+  }
   request.user = user
   next()
 }

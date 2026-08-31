@@ -149,6 +149,8 @@ analyticsRoutes.get('/dashboard', async (request, response, next) => {
     let complimentCount = 0
     let complaintCount = 0
     let totalMessages = 0
+    let ratingsTotal = 0
+    let ratingsSum = 0
     let totalResponseMs = 0
     let responseCount = 0
     let commonQrFeedbackCount = 0
@@ -167,6 +169,11 @@ analyticsRoutes.get('/dashboard', async (request, response, next) => {
 
       totalMessages += 1
       bucket.totalMessages += 1
+
+      if (row.rating && row.rating >= 1 && row.rating <= 5) {
+        ratingsTotal += 1
+        ratingsSum += row.rating
+      }
 
       const customerKey = row.customerId ?? row.id
       activeCustomerKeys.add(customerKey)
@@ -261,6 +268,10 @@ analyticsRoutes.get('/dashboard', async (request, response, next) => {
         averageResponseTimeHours:
           responseCount > 0 ? Number((totalResponseMs / responseCount / 3_600_000).toFixed(1)) : null,
         scans: scanLogs.length,
+      },
+      ratings: {
+        total: ratingsTotal,
+        average: ratingsTotal > 0 ? Number((ratingsSum / ratingsTotal).toFixed(1)) : null,
       },
       commonQr: {
         feedbackCount: commonQrFeedbackCount,

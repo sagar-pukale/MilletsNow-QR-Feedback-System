@@ -8,7 +8,7 @@ import {
   PageHeader,
   PageLayout,
 } from '@/components/layout/page-layout'
-import { apiPath } from '@/lib/api'
+import { apiFetch } from '@/lib/api'
 
 function QRCodesPage() {
   const [commonQr, setCommonQr] = useState<CommonQrData | null>(null)
@@ -23,7 +23,7 @@ function QRCodesPage() {
       setError('')
 
       try {
-        const response = await fetch(apiPath('/qrcodes/common'), { credentials: 'include' })
+        const response = await apiFetch('/qrcodes/common')
         if (!response.ok) throw new Error('Unable to load the common QR code.')
         const body = (await response.json()) as CommonQrData
         if (active) setCommonQr(body)

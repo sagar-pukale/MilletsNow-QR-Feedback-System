@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { apiPath } from '@/lib/api'
+import { apiFetch, apiPath } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
 type ProductItem = {
@@ -92,9 +92,9 @@ function QrCodeStickersPage() {
 
   const loadData = async () => {
     const [templateResponse, productResponse, qrResponse] = await Promise.all([
-      fetch(apiPath('/qr-sticker-templates'), { credentials: 'include' }),
-      fetch(apiPath('/products?limit=100'), { credentials: 'include' }),
-      fetch(apiPath('/qrcodes?limit=200'), { credentials: 'include' }),
+      apiFetch('/qr-sticker-templates'),
+      apiFetch('/products?limit=100'),
+      apiFetch('/qrcodes?limit=200'),
     ])
 
     if (!templateResponse.ok) throw new Error('Unable to load sticker projects.')
@@ -208,9 +208,8 @@ function QrCodeStickersPage() {
         },
       }
 
-      const response = await fetch(apiPath(editor.id ? `/qr-sticker-templates/${editor.id}` : '/qr-sticker-templates'), {
+      const response = await apiFetch(editor.id ? `/qr-sticker-templates/${editor.id}` : '/qr-sticker-templates', {
         method: editor.id ? 'PUT' : 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
@@ -238,9 +237,8 @@ function QrCodeStickersPage() {
     setError('')
     setNotice('')
     try {
-      const response = await fetch(apiPath(`/qr-sticker-templates/${templateId}/duplicate`), {
+      const response = await apiFetch(`/qr-sticker-templates/${templateId}/duplicate`, {
         method: 'POST',
-        credentials: 'include',
       })
       const body = (await response.json().catch(() => null)) as { error?: string } | null
       if (!response.ok) throw new Error(body?.error ?? 'Unable to duplicate sticker project.')
@@ -259,9 +257,8 @@ function QrCodeStickersPage() {
     setError('')
     setNotice('')
     try {
-      const response = await fetch(apiPath(`/qr-sticker-templates/${templateId}`), {
+      const response = await apiFetch(`/qr-sticker-templates/${templateId}`, {
         method: 'DELETE',
-        credentials: 'include',
       })
       if (!response.ok) throw new Error('Unable to delete sticker project.')
       await loadData()

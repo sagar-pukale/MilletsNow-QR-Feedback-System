@@ -3,7 +3,7 @@ import { PrinterIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageContainer, PageDescription, PageHeader, PageHeading, PageLayout, PageTitle } from '@/components/layout/page-layout'
-import { apiPath } from '@/lib/api'
+import { apiFetch } from '@/lib/api'
 
 type QRItem = {
   id: string
@@ -18,7 +18,7 @@ function PrintLabelPage() {
 
   useEffect(() => {
     let active = true
-    void fetch(apiPath('/qrcodes?limit=24'), { credentials: 'include' })
+    void apiFetch('/qrcodes?limit=24')
       .then((response) => response.ok ? response.json() : Promise.reject(new Error('Unable to load QR labels.')))
       .then((body: { items: QRItem[] }) => {
         if (active) setItems(body.items)

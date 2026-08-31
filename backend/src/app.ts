@@ -24,6 +24,16 @@ import { getFrontendDistDir, getUploadRootDir } from './utils/upload-paths.js'
 export const app = express()
 const frontendDistDir = getFrontendDistDir()
 const hasFrontendBuild = existsSync(frontendDistDir)
+const allowedOrigins = new Set([env.CORS_ORIGIN, env.PUBLIC_APP_URL].filter((value): value is string => Boolean(value)))
+
+function isAllowedOrigin(origin: string) {
+  if (allowedOrigins.has(origin)) return true
+  if (origin.endsWith('.vercel.app')) return true
+  if (origin.endsWith('.onrender.com')) return true
+  if (origin.includes('localhost')) return true
+  if (origin.includes('127.0.0.1')) return true
+  return false
+}
 
 app.disable('x-powered-by')
 app.use(helmet({ contentSecurityPolicy: false }))
@@ -32,12 +42,7 @@ app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true)
-      if (
-        origin === env.CORS_ORIGIN ||
-        origin.endsWith('.vercel.app') ||
-        origin.includes('localhost') ||
-        origin.includes('127.0.0.1')
-      ) {
+      if (isAllowedOrigin(origin)) {
         return callback(null, true)
       }
       return callback(new Error('Origin not allowed by CORS'))

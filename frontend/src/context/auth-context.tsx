@@ -1,12 +1,12 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { apiPath } from '@/lib/api'
+import { apiFetch, clearStoredAuthToken, setStoredAuthToken } from '@/lib/api'
 
 export type AuthUser = { id: string; email: string; fullName: string; role: string }
 type AuthContextValue = {
   user: AuthUser | null
   loading: boolean
-  loginSuccess: (user: AuthUser) => void
+  loginSuccess: (user: AuthUser, token?: string | null) => void
   refresh: () => Promise<void>
   logout: () => Promise<void>
 }
@@ -17,18 +17,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const loginSuccess = (loggedUser: AuthUser) => {
+  const loginSuccess = (loggedUser: AuthUser, token?: string | null) => {
+    if (token) setStoredAuthToken(token)
     setUser(loggedUser)
     setLoading(false)
   }
 
   const refresh = async () => {
     try {
-      const response = await fetch(apiPath('/auth/me'), { credentials: 'include' })
+      const response = await apiFetch('/auth/me')
       if (!response.ok) throw new Error('Unauthenticated')
       const body = (await response.json()) as { user: AuthUser }
       setUser(body.user)
     } catch {
+      clearStoredAuthToken()
       setUser(null)
     } finally {
       setLoading(false)
@@ -37,8 +39,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await fetch(apiPath('/auth/logout'), { method: 'POST', credentials: 'include' })
+      await apiFetch('/auth/logout', { method: 'POST' })
     } finally {
+      clearStoredAuthToken()
       setUser(null)
     }
   }
@@ -47,11 +50,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true
     const init = async () => {
       try {
-        const response = await fetch(apiPath('/auth/me'), { credentials: 'include' })
+        const response = await apiFetch('/auth/me')
         if (!response.ok) throw new Error('Unauthenticated')
         const body = (await response.json()) as { user: AuthUser }
         if (active) setUser(body.user)
       } catch {
+        clearStoredAuthToken()
         if (active) setUser(null)
       } finally {
         if (active) setLoading(false)

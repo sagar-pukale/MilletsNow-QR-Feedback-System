@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageContainer, PageDescription, PageHeader, PageHeading, PageLayout, PageTitle } from '@/components/layout/page-layout'
-import { apiPath, appPath } from '@/lib/api'
+import { apiFetch, appPath } from '@/lib/api'
 
 type QRDetails = {
   id: string
@@ -30,7 +30,7 @@ function QRCodeDetailsPage() {
     let active = true
     const load = async () => {
       try {
-        const response = await fetch(apiPath(`/qrcodes/${id}`), { credentials: 'include' })
+        const response = await apiFetch(`/qrcodes/${id}`)
         if (!response.ok) throw new Error('Unable to load QR code details.')
         const body = (await response.json()) as QRDetails
         if (active) setItem(body)

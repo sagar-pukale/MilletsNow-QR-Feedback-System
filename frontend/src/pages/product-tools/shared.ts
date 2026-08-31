@@ -1,4 +1,4 @@
-import { apiPath, appPath, assetUrl } from '@/lib/api'
+import { apiFetch, appPath, assetUrl } from '@/lib/api'
 
 export type ProductLaunchpadRecord = {
   id: string
@@ -27,8 +27,8 @@ export type LaunchpadEntry = {
 
 export async function loadLaunchpadEntries() {
   const [productResponse, qrResponse] = await Promise.all([
-    fetch(apiPath('/products?limit=100'), { credentials: 'include' }),
-    fetch(apiPath('/qrcodes?limit=100'), { credentials: 'include' }),
+    apiFetch('/products?limit=100'),
+    apiFetch('/qrcodes?limit=100'),
   ])
 
   if (!productResponse.ok) throw new Error('Unable to load products.')
