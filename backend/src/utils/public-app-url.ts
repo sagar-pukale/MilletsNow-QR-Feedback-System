@@ -32,17 +32,18 @@ export function configuredPublicAppUrl() {
 }
 
 export function resolvePublicAppUrl(request?: Request) {
+  const configuredUrl = configuredPublicAppUrl()
   const candidates = [
+    configuredUrl,
     normalizeUrl(request?.get('origin')),
     normalizeUrl(originFromReferer(request?.get('referer'))),
-    configuredPublicAppUrl(),
   ]
 
   for (const candidate of candidates) {
     if (isPublicWebOrigin(candidate)) return candidate
   }
 
-  return configuredPublicAppUrl()
+  return configuredUrl
 }
 
 export function buildPublicScanUrl(publicAppUrl: string, token: string) {
