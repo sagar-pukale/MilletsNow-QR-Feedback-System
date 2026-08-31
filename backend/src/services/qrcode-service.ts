@@ -1,8 +1,8 @@
 import QRCode from 'qrcode'
 import { randomBytes } from 'node:crypto'
 import { Prisma } from '@prisma/client'
-import { env } from '../config/env.js'
 import { prisma } from '../config/prisma.js'
+import { buildPublicCommonScanUrl, buildPublicScanUrl, configuredPublicAppUrl } from '../utils/public-app-url.js'
 
 const include = {
   product: { include: { category: true } },
@@ -21,25 +21,15 @@ type QRCodeRecord = Prisma.QRCodeGetPayload<{
   include: typeof include
 }>
 
-const publicAppUrl = (env.PUBLIC_APP_URL ?? env.CORS_ORIGIN).replace(/\/+$/, '')
-
-function publicScanUrl(token: string) {
-  return `${publicAppUrl}/scan/${encodeURIComponent(token)}`
+function imageFor(publicAppUrl: string, token: string) {
+  return QRCode.toDataURL(buildPublicScanUrl(publicAppUrl, token), { margin: 1, width: 180 })
 }
 
-function publicCommonScanUrl() {
-  return `${publicAppUrl}/scan`
+function commonImage(publicAppUrl: string) {
+  return QRCode.toDataURL(buildPublicCommonScanUrl(publicAppUrl), { margin: 1, width: 220 })
 }
 
-function imageFor(token: string) {
-  return QRCode.toDataURL(publicScanUrl(token), { margin: 1, width: 180 })
-}
-
-function commonImage() {
-  return QRCode.toDataURL(publicCommonScanUrl(), { margin: 1, width: 220 })
-}
-
-async function present(record: QRCodeRecord) {
+async function present(record: QRCodeRecord, publicAppUrl: string) {
   const lastScan = record.scanLogs[0]?.scannedAt ?? null
 
   return {
@@ -53,7 +43,7 @@ async function present(record: QRCodeRecord) {
     batchId: record.batchId,
     batchNumber: record.batch?.batchNumber ?? null,
     qrToken: record.code,
-    qrImage: await imageFor(record.code),
+    qrImage: await imageFor(publicAppUrl, record.code),
     status: record.status === 'revoked' ? 'deactivated' : record.status,
     scanCount: record.scanLogs.length,
     createdAt: record.createdAt,
@@ -63,24 +53,24 @@ async function present(record: QRCodeRecord) {
     mrp: record.product.mrp?.toString() ?? null,
     description: record.product.description ?? null,
     imageUrl: record.product.imageUrl ?? null,
-    destinationUrl: publicScanUrl(record.code),
+    destinationUrl: buildPublicScanUrl(publicAppUrl, record.code),
     lastScan,
   }
 }
 
 export const qrCodeService = {
-  async getCommonQr() {
+  async getCommonQr(publicAppUrl = configuredPublicAppUrl()) {
     return {
       id: 'common-qr',
       label: 'Common QR',
       qrToken: 'COMMON_QR',
-      qrImage: await commonImage(),
-      destinationUrl: publicCommonScanUrl(),
+      qrImage: await commonImage(publicAppUrl),
+      destinationUrl: buildPublicCommonScanUrl(publicAppUrl),
       source: 'common_qr' as const,
     }
   },
 
-  async list(query: { search?: string; productId?: string; batchId?: string; status?: string; page?: string; limit?: string }) {
+  async list(query: { search?: string; productId?: string; batchId?: string; status?: string; page?: string; limit?: string }, publicAppUrl = configuredPublicAppUrl()) {
     const page = Math.max(1, Number(query.page) || 1)
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 10))
     const status = query.status === 'deactivated' ? 'revoked' : query.status
@@ -110,22 +100,22 @@ export const qrCodeService = {
     ])
 
     return {
-      items: await Promise.all(rows.map((row) => present(row))),
+      items: await Promise.all(rows.map((row) => present(row, publicAppUrl))),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     }
   },
 
-  async get(id: string) {
+  async get(id: string, publicAppUrl = configuredPublicAppUrl()) {
     const row = await prisma.qRCode.findUnique({ where: { id }, include })
-    return row ? present(row) : null
+    return row ? present(row, publicAppUrl) : null
   },
 
-  async findByToken(code: string) {
+  async findByToken(code: string, publicAppUrl = configuredPublicAppUrl()) {
     const row = await prisma.qRCode.findUnique({ where: { code }, include })
-    return row ? present(row) : null
+    return row ? present(row, publicAppUrl) : null
   },
 
-  async generate(input: { productId: string; batchId?: string; quantity?: number }) {
+  async generate(input: { productId: string; batchId?: string; quantity?: number }, publicAppUrl = configuredPublicAppUrl()) {
     const product = await prisma.product.findUnique({
       where: { id: input.productId },
       include: { category: true },
@@ -152,14 +142,14 @@ export const qrCodeService = {
             productId: product.id,
             batchId: batch?.id,
             code,
-            destinationUrl: publicScanUrl(code),
+            destinationUrl: buildPublicScanUrl(publicAppUrl, code),
           },
           include,
         }),
       )
     }
 
-    return Promise.all(created.map((row) => present(row)))
+    return Promise.all(created.map((row) => present(row, publicAppUrl)))
   },
 
   async recordScan(input: {
@@ -187,12 +177,12 @@ export const qrCodeService = {
     }
   },
 
-  async setStatus(id: string, status: 'active' | 'deactivated') {
+  async setStatus(id: string, status: 'active' | 'deactivated', publicAppUrl = configuredPublicAppUrl()) {
     const row = await prisma.qRCode.update({
       where: { id },
       data: { status: status === 'deactivated' ? 'revoked' : 'active' },
       include,
     })
-    return present(row)
+    return present(row, publicAppUrl)
   },
 }

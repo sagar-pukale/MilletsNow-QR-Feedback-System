@@ -2,8 +2,8 @@ import QRCode from 'qrcode'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { Prisma } from '@prisma/client'
 
-import { env } from '../config/env.js'
 import { prisma } from '../config/prisma.js'
+import { buildPublicScanUrl, configuredPublicAppUrl } from '../utils/public-app-url.js'
 import { qrStickerTemplateSchema, qrStickerTemplateUpdateSchema, stickerTemplateIdSchema } from '../validators/qr-sticker-template-validator.js'
 
 const pointsPerInch = 72
@@ -45,14 +45,10 @@ type StickerTemplateRecord = Prisma.QRStickerTemplateGetPayload<{
 }>
 
 function defaultDestinationUrl(token: string, publicBaseUrl: string) {
-  return `${publicBaseUrl.replace(/\/+$/, '')}/scan/${encodeURIComponent(token)}`
+  return buildPublicScanUrl(publicBaseUrl, token)
 }
 
-function normalizeDestinationUrl(destinationUrl: string | null | undefined, token: string, publicBaseUrl: string) {
-  if (destinationUrl && /^https?:\/\//i.test(destinationUrl) && !destinationUrl.includes('localhost')) {
-    return destinationUrl
-  }
-
+function normalizeDestinationUrl(_destinationUrl: string | null | undefined, token: string, publicBaseUrl: string) {
   return defaultDestinationUrl(token, publicBaseUrl)
 }
 
@@ -123,9 +119,10 @@ async function qrImageFor(template: {
   })
 }
 
-async function present(record: StickerTemplateRecord) {
+async function present(record: StickerTemplateRecord, publicBaseUrl: string) {
+  const qrDestinationUrl = normalizeDestinationUrl(record.qrDestinationUrl, record.qrToken, publicBaseUrl)
   const qrImage = await qrImageFor({
-    qrDestinationUrl: record.qrDestinationUrl,
+    qrDestinationUrl,
     qrSize: record.qrSize,
   })
 
@@ -137,7 +134,7 @@ async function present(record: StickerTemplateRecord) {
     productSku: record.productSku,
     qrCodeId: record.qrCodeId,
     qrToken: record.qrToken,
-    qrDestinationUrl: record.qrDestinationUrl,
+    qrDestinationUrl,
     labelTemplate: record.labelTemplate,
     labelTemplateName: labelTemplateConfig.avery_5160.name,
     textMode: record.textMode,
@@ -157,7 +154,7 @@ async function present(record: StickerTemplateRecord) {
   }
 }
 
-async function buildPdfBuffer(record: StickerTemplateRecord) {
+async function buildPdfBuffer(record: StickerTemplateRecord, publicBaseUrl: string) {
   const pdf = await PDFDocument.create()
   const pageConfig = labelTemplateConfig.avery_5160
   const page = pdf.addPage([
@@ -166,8 +163,9 @@ async function buildPdfBuffer(record: StickerTemplateRecord) {
   ])
   const font = await pdf.embedFont(StandardFonts.Helvetica)
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold)
+  const qrDestinationUrl = normalizeDestinationUrl(record.qrDestinationUrl, record.qrToken, publicBaseUrl)
   const qrPng = await pdf.embedPng(await qrImageFor({
-    qrDestinationUrl: record.qrDestinationUrl,
+    qrDestinationUrl,
     qrSize: 240,
   }))
 
@@ -232,7 +230,7 @@ async function buildPdfBuffer(record: StickerTemplateRecord) {
         color: rgb(0.34, 0.31, 0.31),
         maxWidth: labelWidth - (textX - x) - 8,
       })
-      page.drawText(record.qrDestinationUrl, {
+      page.drawText(qrDestinationUrl, {
         x: x + 6,
         y: y + 4,
         size: 6,
@@ -247,7 +245,7 @@ async function buildPdfBuffer(record: StickerTemplateRecord) {
 }
 
 export const qrStickerTemplateService = {
-  async list() {
+  async list(publicBaseUrl = configuredPublicAppUrl()) {
     const rows = await prisma.qRStickerTemplate.findMany({
       include: {
         product: {
@@ -272,11 +270,11 @@ export const qrStickerTemplateService = {
     })
 
     return {
-      items: await Promise.all(rows.map((row) => present(row))),
+      items: await Promise.all(rows.map((row) => present(row, publicBaseUrl))),
     }
   },
 
-  async get(id: string) {
+  async get(id: string, publicBaseUrl = configuredPublicAppUrl()) {
     const templateId = stickerTemplateIdSchema.parse(id)
     const row = await prisma.qRStickerTemplate.findUnique({
       where: { id: templateId },
@@ -299,7 +297,7 @@ export const qrStickerTemplateService = {
       },
     })
 
-    return row ? present(row) : null
+    return row ? present(row, publicBaseUrl) : null
   },
 
   async create(input: unknown, publicBaseUrl: string) {
@@ -341,7 +339,7 @@ export const qrStickerTemplateService = {
       },
     })
 
-    return present(row)
+    return present(row, publicBaseUrl)
   },
 
   async update(id: string, input: unknown, publicBaseUrl: string) {
@@ -389,7 +387,7 @@ export const qrStickerTemplateService = {
       },
     })
 
-    return present(row)
+    return present(row, publicBaseUrl)
   },
 
   async duplicate(id: string, publicBaseUrl: string) {
@@ -431,7 +429,7 @@ export const qrStickerTemplateService = {
       },
     })
 
-    return present(row)
+    return present(row, publicBaseUrl)
   },
 
   async remove(id: string) {
@@ -444,7 +442,7 @@ export const qrStickerTemplateService = {
     }
   },
 
-  async downloadPdf(id: string) {
+  async downloadPdf(id: string, publicBaseUrl = configuredPublicAppUrl()) {
     const templateId = stickerTemplateIdSchema.parse(id)
     const row = await prisma.qRStickerTemplate.findUnique({
       where: { id: templateId },
@@ -470,7 +468,7 @@ export const qrStickerTemplateService = {
 
     return {
       filename: `${row.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'qr-sticker-template'}.pdf`,
-      buffer: await buildPdfBuffer(row),
+      buffer: await buildPdfBuffer(row, publicBaseUrl),
     }
   },
 }

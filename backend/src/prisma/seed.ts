@@ -1,9 +1,10 @@
 import { prisma } from '../config/prisma.js'
 import bcrypt from 'bcryptjs'
 import { env } from '../config/env.js'
+import { buildPublicScanUrl, configuredPublicAppUrl } from '../utils/public-app-url.js'
 
 const shouldSeedAdmin = process.env.SEED_ADMIN !== 'false'
-const publicAppUrl = (env.PUBLIC_APP_URL ?? env.CORS_ORIGIN).replace(/\/+$/, '')
+const publicAppUrl = configuredPublicAppUrl()
 const supabaseUrl = (env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? 'https://pezmxujnnwarhbgvutal.supabase.co').replace(/\/+$/, '')
 const milletsLadooImageUrl = `${supabaseUrl}/storage/v1/object/public/${env.SUPABASE_STORAGE_BUCKET}/Milletsladoo.jpeg`
 
@@ -69,13 +70,13 @@ const batch = product.batches[0]
 if (batch) {
   await prisma.qRCode.upsert({
     where: { code: 'MN-LADO-00001' },
-    update: { status: 'active', productId: product.id, batchId: batch.id, destinationUrl: `${publicAppUrl}/scan/MN-LADO-00001` },
+    update: { status: 'active', productId: product.id, batchId: batch.id, destinationUrl: buildPublicScanUrl(publicAppUrl, 'MN-LADO-00001') },
     create: {
       code: 'MN-LADO-00001',
       productId: product.id,
       batchId: batch.id,
       status: 'active',
-      destinationUrl: `${publicAppUrl}/scan/MN-LADO-00001`,
+      destinationUrl: buildPublicScanUrl(publicAppUrl, 'MN-LADO-00001'),
     },
   })
 }

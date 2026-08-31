@@ -1,18 +1,12 @@
 import type { NextFunction, Request, Response } from 'express'
 
 import { qrStickerTemplateService } from '../services/qr-sticker-template-service.js'
-
-function publicBaseUrl(request: Request) {
-  const protocol = request.get('x-forwarded-proto') ?? request.protocol
-  const host = request.get('x-forwarded-host') ?? request.get('host')
-  if (!host) return 'https://millets-now-qr-feedback-system.vercel.app'
-  return `${protocol}://${host}`
-}
+import { resolvePublicAppUrl } from '../utils/public-app-url.js'
 
 export const qrStickerTemplateController = {
-  async list(_request: Request, response: Response, next: NextFunction) {
+  async list(request: Request, response: Response, next: NextFunction) {
     try {
-      response.json(await qrStickerTemplateService.list())
+      response.json(await qrStickerTemplateService.list(resolvePublicAppUrl(request)))
     } catch (error) {
       next(error)
     }
@@ -20,7 +14,7 @@ export const qrStickerTemplateController = {
 
   async get(request: Request, response: Response, next: NextFunction) {
     try {
-      const template = await qrStickerTemplateService.get(String(request.params.id))
+      const template = await qrStickerTemplateService.get(String(request.params.id), resolvePublicAppUrl(request))
       if (!template) return response.status(404).json({ error: 'Sticker template not found' })
       response.json(template)
     } catch (error) {
@@ -30,7 +24,7 @@ export const qrStickerTemplateController = {
 
   async create(request: Request, response: Response, next: NextFunction) {
     try {
-      response.status(201).json(await qrStickerTemplateService.create(request.body, publicBaseUrl(request)))
+      response.status(201).json(await qrStickerTemplateService.create(request.body, resolvePublicAppUrl(request)))
     } catch (error) {
       next(error)
     }
@@ -38,7 +32,7 @@ export const qrStickerTemplateController = {
 
   async update(request: Request, response: Response, next: NextFunction) {
     try {
-      const template = await qrStickerTemplateService.update(String(request.params.id), request.body, publicBaseUrl(request))
+      const template = await qrStickerTemplateService.update(String(request.params.id), request.body, resolvePublicAppUrl(request))
       if (!template) return response.status(404).json({ error: 'Sticker template not found' })
       response.json(template)
     } catch (error) {
@@ -48,7 +42,7 @@ export const qrStickerTemplateController = {
 
   async duplicate(request: Request, response: Response, next: NextFunction) {
     try {
-      const template = await qrStickerTemplateService.duplicate(String(request.params.id), publicBaseUrl(request))
+      const template = await qrStickerTemplateService.duplicate(String(request.params.id), resolvePublicAppUrl(request))
       if (!template) return response.status(404).json({ error: 'Sticker template not found' })
       response.status(201).json(template)
     } catch (error) {
@@ -69,7 +63,7 @@ export const qrStickerTemplateController = {
 
   async downloadPdf(request: Request, response: Response, next: NextFunction) {
     try {
-      const pdf = await qrStickerTemplateService.downloadPdf(String(request.params.id))
+      const pdf = await qrStickerTemplateService.downloadPdf(String(request.params.id), resolvePublicAppUrl(request))
       if (!pdf) return response.status(404).json({ error: 'Sticker template not found' })
 
       const disposition = request.query.disposition === 'inline' ? 'inline' : 'attachment'
