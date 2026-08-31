@@ -38,6 +38,14 @@
       "destination": "/api/index.ts"
     },
     {
+      "source": "/scan/(.*)",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/scan",
+      "destination": "/index.html"
+    },
+    {
       "source": "/feedback",
       "destination": "/api/index.ts"
     },

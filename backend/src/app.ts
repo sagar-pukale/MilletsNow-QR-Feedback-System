@@ -19,6 +19,7 @@ import { healthRoute } from './routes/health-route.js'
 import { feedbackRoutes } from './routes/feedback-routes.js'
 import { analyticsRoutes } from './routes/analytics-routes.js'
 import { qrStickerTemplateRoutes } from './routes/qr-sticker-template-routes.js'
+import { configuredPublicAppUrl } from './utils/public-app-url.js'
 import { getFrontendDistDir, getUploadRootDir } from './utils/upload-paths.js'
 
 export const app = express()
@@ -33,6 +34,17 @@ function isAllowedOrigin(origin: string) {
   if (origin.includes('localhost')) return true
   if (origin.includes('127.0.0.1')) return true
   return false
+}
+
+function normalizeUrl(value?: string | null) {
+  return (value ?? '').trim().replace(/\/+$/, '')
+}
+
+function requestOrigin(request: express.Request) {
+  const forwardedProto = request.get('x-forwarded-proto')?.split(',')[0]?.trim()
+  const protocol = forwardedProto || request.protocol
+  const host = request.get('x-forwarded-host') || request.get('host')
+  return host ? `${protocol}://${host}` : ''
 }
 
 app.disable('x-powered-by')
@@ -67,6 +79,20 @@ app.use(['/analytics', '/api/analytics'], analyticsRoutes)
 app.use(['/qr-sticker-templates', '/api/qr-sticker-templates'], qrStickerTemplateRoutes)
 app.use('/api/scan', scanRoutes)
 app.use(['/feedback', '/api/feedback', '/complaint', '/api/complaint', '/compliment', '/api/compliment'], feedbackRoutes)
+
+app.get(['/scan', '/scan/*'], (request, response, next) => {
+  if (hasFrontendBuild) return next()
+
+  const publicAppUrl = configuredPublicAppUrl()
+  if (!publicAppUrl) return next()
+
+  const currentOrigin = normalizeUrl(requestOrigin(request))
+  const targetOrigin = normalizeUrl(publicAppUrl)
+  if (!targetOrigin || currentOrigin === targetOrigin) return next()
+
+  const query = request.originalUrl.includes('?') ? request.originalUrl.slice(request.path.length) : ''
+  response.redirect(302, `${targetOrigin}${request.path}${query}`)
+})
 
 if (hasFrontendBuild) {
   app.use(express.static(frontendDistDir))
