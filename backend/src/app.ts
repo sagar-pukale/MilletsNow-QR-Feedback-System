@@ -80,7 +80,7 @@ app.use(['/qr-sticker-templates', '/api/qr-sticker-templates'], qrStickerTemplat
 app.use('/api/scan', scanRoutes)
 app.use(['/feedback', '/api/feedback', '/complaint', '/api/complaint', '/compliment', '/api/compliment'], feedbackRoutes)
 
-app.get(['/scan', '/scan/*'], (request, response, next) => {
+app.get(/^\/scan(?:\/.*)?$/, (request, response, next) => {
   if (hasFrontendBuild) return next()
 
   const publicAppUrl = configuredPublicAppUrl()
