@@ -207,6 +207,10 @@ model Feedback {
   latitude       Float?           @db.DoublePrecision
   longitude      Float?           @db.DoublePrecision
   locationAccuracy Float?         @map("location_accuracy") @db.DoublePrecision
+  locationLabel  String?          @map("location_label")
+  locationLocality String?        @map("location_locality")
+  locationDistrict String?        @map("location_district")
+  locationState  String?          @map("location_state")
   locationAddress String?         @map("location_address")
   userAgent      String?          @map("user_agent")
   deviceType     String?          @map("device_type")

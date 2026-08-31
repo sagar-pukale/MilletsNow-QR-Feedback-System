@@ -37,6 +37,8 @@ const envSchema = z.object({
   SUPABASE_PUBLISHABLE_KEY: z.string().min(1).optional(),
   SUPABASE_ANON_KEY: z.string().min(1).optional(),
   SUPABASE_STORAGE_BUCKET: z.string().min(1).default('farmer-uploads'),
+  REVERSE_GEOCODER_BASE_URL: z.string().url().optional(),
+  REVERSE_GEOCODER_CONTACT: z.string().min(3).optional(),
   UPLOAD_DIR: z.string().default('uploads'),
   ADMIN_EMAIL: z.string().email().optional(),
   ADMIN_PASSWORD: z.string().min(12).optional(),
