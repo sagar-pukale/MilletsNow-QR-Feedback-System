@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { MapPinIcon, MessageSquareTextIcon, RefreshCwIcon, StarIcon } from 'lucide-react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -56,6 +56,7 @@ function formatVisibleDate(value: string) {
 }
 
 function DashboardPage() {
+  const refreshIntervalMs = 5_000
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const [overallSummary, setOverallSummary] = useState<FeedbackSummaryResponse['summary'] | null>(null)
@@ -63,10 +64,14 @@ function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
+  const activeRequestRef = useRef(0)
   const selectedDate = searchParams.get('date') || formatIstDateValue(new Date())
   const selectedDateLabel = formatVisibleDate(selectedDate)
 
   const loadDashboard = async (mode: 'initial' | 'refresh' = 'initial') => {
+    const requestId = activeRequestRef.current + 1
+    activeRequestRef.current = requestId
+
     if (mode === 'initial') setLoading(true)
     if (mode === 'refresh') setRefreshing(true)
     setError('')
@@ -83,12 +88,15 @@ function DashboardPage() {
 
       const overallPayload = (await overallResponse.json()) as FeedbackSummaryResponse
       const selectedDatePayload = (await selectedDateResponse.json()) as DashboardAnalyticsResponse
+      if (activeRequestRef.current !== requestId) return
 
       setOverallSummary(overallPayload.summary)
       setSelectedDateSummary(selectedDatePayload)
     } catch (reason) {
+      if (activeRequestRef.current !== requestId) return
       setError(reason instanceof Error ? reason.message : 'Unable to load dashboard metrics.')
     } finally {
+      if (activeRequestRef.current !== requestId) return
       setLoading(false)
       setRefreshing(false)
     }
@@ -104,16 +112,23 @@ function DashboardPage() {
     const timer = window.setTimeout(() => {
       void loadDashboard('initial')
     }, 0)
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void loadDashboard('refresh')
+      }
+    }, refreshIntervalMs)
 
     window.addEventListener('focus', refreshIfVisible)
     document.addEventListener('visibilitychange', refreshIfVisible)
 
     return () => {
+      activeRequestRef.current += 1
       window.clearTimeout(timer)
+      window.clearInterval(intervalId)
       window.removeEventListener('focus', refreshIfVisible)
       document.removeEventListener('visibilitychange', refreshIfVisible)
     }
-  }, [location.key, location.pathname, selectedDate])
+  }, [location.key, location.pathname, selectedDate, refreshIntervalMs])
 
   const summaryCards = useMemo(
     () => [
