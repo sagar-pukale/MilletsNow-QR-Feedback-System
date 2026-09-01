@@ -55,6 +55,26 @@ type FeedbackSummary = {
 
 type ActiveMetric = 'all' | 'total' | 'average' | 'rated' | 'common_qr'
 
+function normalizedFeedbackText(value: string | null) {
+  const text = value?.trim()
+  if (!text) return null
+
+  const isUrl = /^https?:\/\//i.test(text)
+  const isHostname = /^(?:[a-z0-9-]+\.)+[a-z]{2,}$/i.test(text)
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text)
+  const isQrToken = /^[A-Z0-9]+(?:-[A-Z0-9]+){2,}$/i.test(text)
+  const isNumericId = /^[0-9]{8,}$/.test(text)
+  const isMachineSlug =
+    /^[a-z0-9]+(?:-[a-z0-9]+){1,}$/i.test(text) &&
+    (/(^|[-_])(host|hostname|render|vercel|repeat|token|qr|test)([-_]|$)/i.test(text) || /-\d{6,}$/.test(text))
+
+  if (isUrl || isHostname || isUuid || isQrToken || isNumericId || isMachineSlug) {
+    return null
+  }
+
+  return text
+}
+
 function mapLocationHref(item: Message) {
   if (item.latitude == null || item.longitude == null) return null
   return `https://www.google.com/maps?q=${encodeURIComponent(`${item.latitude},${item.longitude}`)}`
@@ -327,7 +347,7 @@ function MessagesPage() {
             <Card className="border-[#d8ebf0] bg-white shadow-[0_18px_40px_rgba(18,74,88,0.06)]">
               <CardContent className="divide-y p-0">
                 {filteredItems.map((item) => {
-                  const message = item.message?.trim() || 'No written feedback was submitted.'
+                  const message = normalizedFeedbackText(item.message) ?? 'No written feedback'
                   const authorLabel = messageAuthorLabel(item)
                   const showTextOnly = activeMetric === 'total'
                   const showTypeBadge = activeMetric === 'all'
