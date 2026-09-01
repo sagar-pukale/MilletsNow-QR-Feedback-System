@@ -2,6 +2,8 @@ import type { Request } from 'express'
 
 import { env } from '../config/env.js'
 
+const canonicalProductionPublicAppUrl = 'https://millets-now-qr-feedback-system.vercel.app'
+
 function normalizeUrl(value?: string | null) {
   return (value ?? '').trim().replace(/\/+$/, '')
 }
@@ -17,6 +19,22 @@ function isPublicWebOrigin(value: string) {
   }
 }
 
+function canonicalizeConfiguredPublicUrl(value?: string | null) {
+  const normalized = normalizeUrl(value)
+  if (!normalized) return normalized
+
+  try {
+    const url = new URL(normalized)
+    if (env.NODE_ENV === 'production' && /(?:^|\.)onrender\.com$/i.test(url.hostname)) {
+      return canonicalProductionPublicAppUrl
+    }
+  } catch {
+    return normalized
+  }
+
+  return normalized
+}
+
 function originFromReferer(value?: string | null) {
   if (!value) return ''
 
@@ -28,7 +46,7 @@ function originFromReferer(value?: string | null) {
 }
 
 export function configuredPublicAppUrl() {
-  return normalizeUrl(env.PUBLIC_APP_URL ?? env.CORS_ORIGIN)
+  return canonicalizeConfiguredPublicUrl(env.PUBLIC_APP_URL ?? env.CORS_ORIGIN) || canonicalProductionPublicAppUrl
 }
 
 export function resolvePublicAppUrl(request?: Request) {
