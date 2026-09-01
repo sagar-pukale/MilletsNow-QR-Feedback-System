@@ -6,7 +6,8 @@ function normalizeBaseUrl(value?: string) {
 }
 
 const configuredApiUrl = normalizeBaseUrl(import.meta.env.VITE_API_URL)
-const resolvedApiUrl = configuredApiUrl || (import.meta.env.PROD ? productionApiFallback : '')
+const browserBaseUrl = browserOrigin()
+const resolvedApiUrl = configuredApiUrl || browserBaseUrl || (import.meta.env.PROD ? productionApiFallback : '')
 const configuredAppUrl = normalizeBaseUrl(import.meta.env.VITE_APP_URL)
 
 function browserOrigin() {
@@ -76,6 +77,6 @@ export function assetUrl(value?: string | null) {
 
 export function appPath(path: string) {
   const normalized = withLeadingSlash(path)
-  const appBaseUrl = configuredAppUrl || browserOrigin() || resolvedApiUrl
+  const appBaseUrl = configuredAppUrl || browserBaseUrl || resolvedApiUrl
   return `${appBaseUrl}${normalized}`
 }

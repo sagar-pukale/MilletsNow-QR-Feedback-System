@@ -20,5 +20,10 @@ export function getUploadRootDir() {
 }
 
 export function getFrontendDistDir() {
+  const backendBundledFrontendDir = path.resolve(getBackendRoot(), 'frontend-dist')
+  if (existsSync(path.join(backendBundledFrontendDir, 'index.html'))) {
+    return backendBundledFrontendDir
+  }
+
   return path.resolve(getWorkspaceRoot(), 'frontend', 'dist')
 }

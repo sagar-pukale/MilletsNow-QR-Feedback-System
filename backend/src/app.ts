@@ -47,6 +47,17 @@ function requestOrigin(request: express.Request) {
   return host ? `${protocol}://${host}` : ''
 }
 
+function isNonLocalWebOrigin(origin: string) {
+  if (!origin) return false
+
+  try {
+    const url = new URL(origin)
+    return /^https?:$/i.test(url.protocol) && !/^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/i.test(url.hostname)
+  } catch {
+    return false
+  }
+}
+
 app.disable('x-powered-by')
 app.use(helmet({ contentSecurityPolicy: false }))
 
@@ -81,13 +92,25 @@ app.use('/api/scan', scanRoutes)
 app.use(['/feedback', '/api/feedback', '/complaint', '/api/complaint', '/compliment', '/api/compliment'], feedbackRoutes)
 
 app.get(/^\/scan(?:\/.*)?$/, (request, response, next) => {
-  if (hasFrontendBuild) return next()
-
   const publicAppUrl = configuredPublicAppUrl()
   if (!publicAppUrl) return next()
 
   const currentOrigin = normalizeUrl(requestOrigin(request))
   const targetOrigin = normalizeUrl(publicAppUrl)
+  if (
+    env.NODE_ENV === 'production' &&
+    targetOrigin &&
+    currentOrigin &&
+    currentOrigin !== targetOrigin &&
+    isNonLocalWebOrigin(currentOrigin)
+  ) {
+    const query = request.originalUrl.includes('?') ? request.originalUrl.slice(request.path.length) : ''
+    response.redirect(302, `${targetOrigin}${request.path}${query}`)
+    return
+  }
+
+  if (hasFrontendBuild) return next()
+
   if (!targetOrigin || currentOrigin === targetOrigin) return next()
 
   const query = request.originalUrl.includes('?') ? request.originalUrl.slice(request.path.length) : ''

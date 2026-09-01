@@ -6,6 +6,7 @@ import milletsProductsImage from '@/assets/products/millets-products.png'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { socialLinks } from '@/constants/social-links'
+import { apiPath } from '@/lib/api'
 import { collectFeedbackLocation } from '@/lib/feedback-submission-metadata'
 import { cn } from '@/lib/utils'
 import { CustomerPageShell } from './scan-shared'
@@ -41,7 +42,7 @@ function CommonFeedbackPage() {
         setLocationNotice('Location was unavailable on this device. Feedback will be submitted without location.')
       }
 
-      const response = await fetch('/api/feedback', {
+      const response = await fetch(apiPath('/feedback'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

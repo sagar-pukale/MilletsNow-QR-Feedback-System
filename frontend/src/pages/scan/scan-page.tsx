@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangleIcon, ChevronRightIcon, HeartHandshakeIcon, MessageSquareWarningIcon, StarIcon } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
+import { apiPath } from '@/lib/api'
 import { BrandHeader, CustomerPageShell, FollowUs, ProductHero, type ScanPayload } from './scan-shared'
 
 const actions = [
@@ -39,7 +40,7 @@ function ScanPage() {
   useEffect(() => {
     let active = true
 
-    fetch(`/api/scan/${encodeURIComponent(qrToken)}`)
+    fetch(apiPath(`/scan/${encodeURIComponent(qrToken)}`))
       .then(async (response) => {
         if (!response.ok) {
           throw new Error(

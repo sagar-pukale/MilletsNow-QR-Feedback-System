@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../config/prisma.js'
 import { buildPublicCommonScanUrl, buildPublicScanUrl, configuredPublicAppUrl } from '../utils/public-app-url.js'
+import { resolveQrTokenCandidates } from '../utils/qr-token.js'
 
 const include = {
   product: { include: { category: true } },
@@ -29,7 +30,7 @@ function commonImage(publicAppUrl: string) {
   return QRCode.toDataURL(buildPublicCommonScanUrl(publicAppUrl), { margin: 1, width: 220 })
 }
 
-async function present(record: QRCodeRecord, publicAppUrl: string) {
+async function present(record: QRCodeRecord, publicAppUrl: string, publicToken = record.code) {
   const lastScan = record.scanLogs[0]?.scannedAt ?? null
 
   return {
@@ -42,8 +43,8 @@ async function present(record: QRCodeRecord, publicAppUrl: string) {
     unit: record.product.unit ?? null,
     batchId: record.batchId,
     batchNumber: record.batch?.batchNumber ?? null,
-    qrToken: record.code,
-    qrImage: await imageFor(publicAppUrl, record.code),
+    qrToken: publicToken,
+    qrImage: await imageFor(publicAppUrl, publicToken),
     status: record.status === 'revoked' ? 'deactivated' : record.status,
     scanCount: record.scanLogs.length,
     createdAt: record.createdAt,
@@ -53,7 +54,7 @@ async function present(record: QRCodeRecord, publicAppUrl: string) {
     mrp: record.product.mrp?.toString() ?? null,
     description: record.product.description ?? null,
     imageUrl: record.product.imageUrl ?? null,
-    destinationUrl: buildPublicScanUrl(publicAppUrl, record.code),
+    destinationUrl: buildPublicScanUrl(publicAppUrl, publicToken),
     lastScan,
   }
 }
@@ -111,8 +112,15 @@ export const qrCodeService = {
   },
 
   async findByToken(code: string, publicAppUrl = configuredPublicAppUrl()) {
-    const row = await prisma.qRCode.findUnique({ where: { code }, include })
-    return row ? present(row, publicAppUrl) : null
+    const candidates = resolveQrTokenCandidates(code)
+    const row = await prisma.qRCode.findFirst({
+      where: { code: { in: candidates } },
+      include,
+      orderBy: {
+        createdAt: 'desc',
+      },
+    })
+    return row ? present(row, publicAppUrl, code.trim().toUpperCase()) : null
   },
 
   async generate(input: { productId: string; batchId?: string; quantity?: number }, publicAppUrl = configuredPublicAppUrl()) {

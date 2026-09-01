@@ -10,9 +10,9 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "postinstall": "prisma generate --schema src/prisma/schema.prisma",
-    "build": "prisma generate --schema src/prisma/schema.prisma && tsc -p tsconfig.json",
+    "build": "prisma generate --schema src/prisma/schema.prisma && node scripts/render-build-frontend.mjs && tsc -p tsconfig.json",
     "build:vercel": "prisma generate --schema src/prisma/schema.prisma && tsc -p tsconfig.vercel.json",
-    "start": "node dist/server.js",
+    "start": "node scripts/start-with-render-frontend.mjs",
     "prisma:generate": "prisma generate --schema src/prisma/schema.prisma",
     "prisma:validate": "prisma validate --schema src/prisma/schema.prisma",
     "prisma:seed": "tsx src/prisma/seed.ts",

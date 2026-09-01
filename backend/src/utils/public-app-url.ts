@@ -2,7 +2,7 @@ import type { Request } from 'express'
 
 import { env } from '../config/env.js'
 
-const canonicalProductionPublicAppUrl = 'https://millets-now-qr-feedback-system.vercel.app'
+const canonicalProductionPublicAppUrl = 'https://milletsnow-qr-feedback-system.onrender.com'
 
 function normalizeUrl(value?: string | null) {
   return (value ?? '').trim().replace(/\/+$/, '')
@@ -25,7 +25,11 @@ function canonicalizeConfiguredPublicUrl(value?: string | null) {
 
   try {
     const url = new URL(normalized)
-    if (env.NODE_ENV === 'production' && /(?:^|\.)onrender\.com$/i.test(url.hostname)) {
+    if (
+      env.NODE_ENV === 'production' &&
+      (/millets-now-qr-feedback-system\.vercel\.app$/i.test(url.hostname) ||
+        /milletsnow-qr-feedback-system-1\.onrender\.com$/i.test(url.hostname))
+    ) {
       return canonicalProductionPublicAppUrl
     }
   } catch {

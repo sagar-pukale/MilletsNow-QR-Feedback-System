@@ -4,6 +4,7 @@ import { ArrowLeftIcon, ImagePlusIcon, LoaderCircleIcon, StarIcon, TriangleAlert
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { apiPath } from '@/lib/api'
 import { collectFeedbackLocation } from '@/lib/feedback-submission-metadata'
 import { BrandHeader, CustomerPageShell, FollowUs, ProductHero, resolveAssetUrl, type ScanPayload } from './scan-shared'
 
@@ -38,7 +39,7 @@ function FeedbackPage() {
   useEffect(() => {
     let active = true
 
-    fetch(`/api/scan/${encodeURIComponent(qrToken)}`)
+    fetch(apiPath(`/scan/${encodeURIComponent(qrToken)}`))
       .then(async (response) => {
         if (!response.ok) {
           throw new Error(
@@ -123,7 +124,7 @@ function FeedbackPage() {
         setLocationNotice('Location was unavailable on this device. Feedback will be submitted without location.')
       }
 
-      const response = await fetch('/api/feedback', { method: 'POST', body })
+      const response = await fetch(apiPath('/feedback'), { method: 'POST', body })
       const payloadBody = (await response.json().catch(() => null)) as { error?: string; details?: Record<string, string[]> } | null
 
       if (!response.ok) {

@@ -9,6 +9,7 @@ import { attachOptionalAuth, requireAuth, type AuthRequest } from '../middleware
 import { FeedbackImageError, uploadFeedbackImage } from '../services/feedback-image-service.js'
 import { reverseGeocodeFeedbackLocation } from '../services/feedback-location-service.js'
 import { parseUserAgent, sanitizeAccuracy, sanitizeCoordinate } from '../services/feedback-submission-metadata-service.js'
+import { resolveQrTokenCandidates } from '../utils/qr-token.js'
 import { feedbackSchema } from '../validators/feedback-validator.js'
 
 export const feedbackRoutes = Router()
@@ -97,9 +98,10 @@ async function submitFeedback(request: UploadRequest, response: Response, next: 
     })
     const source = input.source === 'common_qr' ? 'common_qr' : 'product_qr'
     const qr = input.qrToken
-      ? await prisma.qRCode.findUnique({
-          where: { code: input.qrToken },
+      ? await prisma.qRCode.findFirst({
+          where: { code: { in: resolveQrTokenCandidates(input.qrToken) } },
           select: { id: true, productId: true, batchId: true },
+          orderBy: { createdAt: 'desc' },
         })
       : null
 
