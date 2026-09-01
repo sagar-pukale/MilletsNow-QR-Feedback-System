@@ -1,7 +1,18 @@
-import { Router } from 'express'
+import { type Response, Router } from 'express'
 import { prisma } from '../config/prisma.js'
 
 export const analyticsRoutes = Router()
+
+function disableAdminApiCaching(response: Response) {
+  response.setHeader('Cache-Control', 'private, no-store, no-cache, max-age=0, must-revalidate')
+  response.setHeader('Pragma', 'no-cache')
+  response.setHeader('Expires', '0')
+  response.setHeader('Surrogate-Control', 'no-store')
+  response.setHeader('CDN-Cache-Control', 'private, no-store')
+  response.setHeader('Vercel-CDN-Cache-Control', 'private, no-store')
+  response.vary('Authorization')
+  response.vary('Cookie')
+}
 
 function splitDateParts(date: string) {
   const parts = date.split('-')
@@ -58,9 +69,7 @@ function listDays(startDate: string, endDate: string) {
 
 analyticsRoutes.get('/dashboard', async (request, response, next) => {
   try {
-    response.setHeader('Cache-Control', 'private, no-store, no-cache, must-revalidate')
-    response.setHeader('Pragma', 'no-cache')
-    response.setHeader('Expires', '0')
+    disableAdminApiCaching(response)
 
     const startDate = parseDateParam(request.query.startDate)
     const endDate = parseDateParam(request.query.endDate)

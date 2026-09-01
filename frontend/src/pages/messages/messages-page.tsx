@@ -112,7 +112,7 @@ function MessagesPage() {
 
     const fetchFeedback = async () => {
       try {
-        const response = await apiFetch('/feedback?limit=1000')
+        const response = await apiFetch(`/feedback?limit=1000&_=${Date.now()}`)
         if (!response.ok) {
           throw new Error(
             response.status === 401

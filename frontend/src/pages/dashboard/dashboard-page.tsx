@@ -71,6 +71,7 @@ function DashboardPage() {
   const loadDashboard = async (mode: 'initial' | 'refresh' = 'initial') => {
     const requestId = activeRequestRef.current + 1
     activeRequestRef.current = requestId
+    const requestTime = Date.now()
 
     if (mode === 'initial') setLoading(true)
     if (mode === 'refresh') setRefreshing(true)
@@ -78,8 +79,8 @@ function DashboardPage() {
 
     try {
       const [overallResponse, selectedDateResponse] = await Promise.all([
-        apiFetch('/feedback?limit=1&page=1'),
-        apiFetch(`/analytics/dashboard?startDate=${selectedDate}&endDate=${selectedDate}&timeZoneOffsetMinutes=-330`),
+        apiFetch(`/feedback?limit=1&page=1&_=${requestTime}`),
+        apiFetch(`/analytics/dashboard?startDate=${selectedDate}&endDate=${selectedDate}&timeZoneOffsetMinutes=-330&_=${requestTime}`),
       ])
 
       if (!overallResponse.ok || !selectedDateResponse.ok) {
