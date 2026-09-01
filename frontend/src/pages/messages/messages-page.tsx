@@ -64,6 +64,10 @@ function preferredLocationLabel(item: Message) {
   return item.locationLabel ?? item.locationAddress
 }
 
+function messageAuthorLabel(item: Message) {
+  return item.name?.trim() || item.email?.trim() || `Feedback ${item.id.slice(0, 8)}`
+}
+
 function MessagesPage() {
   const [items, setItems] = useState<Message[]>([])
   const [summary, setSummary] = useState<FeedbackSummary>({
@@ -324,6 +328,7 @@ function MessagesPage() {
               <CardContent className="divide-y p-0">
                 {filteredItems.map((item) => {
                   const message = item.message?.trim() || 'No written feedback was submitted.'
+                  const authorLabel = messageAuthorLabel(item)
                   const showTextOnly = activeMetric === 'total'
                   const showTypeBadge = activeMetric === 'all'
                   const showContextDetails =
@@ -350,15 +355,17 @@ function MessagesPage() {
                       className="flex flex-col gap-2 p-5 sm:flex-row sm:items-start sm:justify-between"
                     >
                       <div className="max-w-4xl">
-                        <p className="text-sm font-semibold text-[#20323a]">{message}</p>
-                        {(item.name || item.email) ? (
-                          <p className="mt-1 text-xs font-medium text-[#425861]">
-                            {[item.name, item.email].filter(Boolean).join(' · ')}
-                          </p>
+                        <p className="text-sm font-semibold text-[#20323a]">{authorLabel}</p>
+                        {(item.name && item.email) ? (
+                          <p className="mt-1 text-xs font-medium text-[#425861]">{item.email}</p>
                         ) : null}
                         {!showTextOnly && metaParts.length > 0 ? (
                           <p className="mt-1 text-xs text-[#6c8189]">{metaParts.join(' · ')}</p>
                         ) : null}
+                        <div className="mt-3 rounded-[1rem] border border-[#dcecf0] bg-[#f9fdfe] px-4 py-3">
+                          <p className="text-[11px] font-bold tracking-[0.14em] text-[#688089] uppercase">Feedback</p>
+                          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#20323a]">{message}</p>
+                        </div>
                         {(locationLabel || item.latitude != null || item.longitude != null || item.locationAccuracy != null || deviceLabel || mapHref) ? (
                           <div className="mt-2 space-y-1 text-xs text-[#6c8189]">
                             {locationLabel ? <p>Location: {locationLabel}</p> : null}
