@@ -113,9 +113,7 @@ function DashboardPage() {
       void loadDashboard('initial')
     }, 0)
     const intervalId = window.setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        void loadDashboard('refresh')
-      }
+      void loadDashboard('refresh')
     }, refreshIntervalMs)
 
     window.addEventListener('focus', refreshIfVisible)
