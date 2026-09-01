@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MapPinIcon, MessageSquareTextIcon, RefreshCwIcon, StarIcon } from 'lucide-react'
-import { useSearchParams } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -56,6 +56,7 @@ function formatVisibleDate(value: string) {
 }
 
 function DashboardPage() {
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const [overallSummary, setOverallSummary] = useState<FeedbackSummaryResponse['summary'] | null>(null)
   const [selectedDateSummary, setSelectedDateSummary] = useState<DashboardAnalyticsResponse | null>(null)
@@ -94,12 +95,25 @@ function DashboardPage() {
   }
 
   useEffect(() => {
+    const refreshIfVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void loadDashboard('refresh')
+      }
+    }
+
     const timer = window.setTimeout(() => {
       void loadDashboard('initial')
     }, 0)
 
-    return () => window.clearTimeout(timer)
-  }, [selectedDate])
+    window.addEventListener('focus', refreshIfVisible)
+    document.addEventListener('visibilitychange', refreshIfVisible)
+
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('focus', refreshIfVisible)
+      document.removeEventListener('visibilitychange', refreshIfVisible)
+    }
+  }, [location.key, location.pathname, selectedDate])
 
   const summaryCards = useMemo(
     () => [

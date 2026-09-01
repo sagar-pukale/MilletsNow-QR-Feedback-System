@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { DownloadIcon, MessageSquareIcon, QrCodeIcon, StarIcon } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { EmptyState } from '@/components/common/empty-state'
@@ -89,6 +90,7 @@ function messageAuthorLabel(item: Message) {
 }
 
 function MessagesPage() {
+  const location = useLocation()
   const [items, setItems] = useState<Message[]>([])
   const [summary, setSummary] = useState<FeedbackSummary>({
     total: 0,
@@ -132,16 +134,27 @@ function MessagesPage() {
       }
     }
 
+    const refreshIfVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchFeedback()
+      }
+    }
+
     void fetchFeedback()
     const refreshTimer = window.setInterval(() => {
       void fetchFeedback()
     }, 30000)
 
+    window.addEventListener('focus', refreshIfVisible)
+    document.addEventListener('visibilitychange', refreshIfVisible)
+
     return () => {
       active = false
       window.clearInterval(refreshTimer)
+      window.removeEventListener('focus', refreshIfVisible)
+      document.removeEventListener('visibilitychange', refreshIfVisible)
     }
-  }, [])
+  }, [location.key, location.pathname])
 
   const filteredItems = useMemo(() => {
     if (activeMetric === 'rated' || activeMetric === 'average') {

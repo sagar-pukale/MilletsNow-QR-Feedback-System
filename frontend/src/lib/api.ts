@@ -49,13 +49,19 @@ export function clearStoredAuthToken() {
 export function apiFetch(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers)
   const token = getStoredAuthToken()
+  const method = (init.method ?? 'GET').toUpperCase()
 
   if (token && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${token}`)
   }
 
+  if ((method === 'GET' || method === 'HEAD') && !headers.has('Cache-Control')) {
+    headers.set('Cache-Control', 'no-store')
+  }
+
   return fetch(apiPath(path), {
     ...init,
+    cache: init.cache ?? (method === 'GET' || method === 'HEAD' ? 'no-store' : undefined),
     credentials: 'include',
     headers,
   })

@@ -58,6 +58,10 @@ function listDays(startDate: string, endDate: string) {
 
 analyticsRoutes.get('/dashboard', async (request, response, next) => {
   try {
+    response.setHeader('Cache-Control', 'private, no-store, no-cache, must-revalidate')
+    response.setHeader('Pragma', 'no-cache')
+    response.setHeader('Expires', '0')
+
     const startDate = parseDateParam(request.query.startDate)
     const endDate = parseDateParam(request.query.endDate)
     if (!startDate || !endDate) {

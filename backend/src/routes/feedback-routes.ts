@@ -204,6 +204,10 @@ feedbackRoutes.post('/', attachOptionalAuth, handleFeedbackUpload('image'), subm
 
 feedbackRoutes.get('/', requireAuth, async (request, response, next) => {
   try {
+    response.setHeader('Cache-Control', 'private, no-store, no-cache, must-revalidate')
+    response.setHeader('Pragma', 'no-cache')
+    response.setHeader('Expires', '0')
+
     const page = Math.max(1, Number(request.query.page) || 1)
     const limit = Math.min(1000, Math.max(1, Number(request.query.limit) || 20))
     const offset = (page - 1) * limit
