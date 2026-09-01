@@ -29,6 +29,26 @@ function run(command, args, cwd = backendDir) {
   }
 }
 
+function packageInstallPath(baseDir, packageName) {
+  return path.join(baseDir, 'node_modules', ...packageName.split('/'))
+}
+
+function hasPackage(baseDir, packageName) {
+  return existsSync(path.join(packageInstallPath(baseDir, packageName), 'package.json'))
+}
+
+function hasFrontendBuildTooling() {
+  const requiredPackages = ['vite', '@vitejs/plugin-react', '@tailwindcss/vite']
+
+  return requiredPackages.every((packageName) => {
+    return hasPackage(workspaceRoot, packageName) || hasPackage(frontendDir, packageName)
+  })
+}
+
+function installWorkspaceDependencies() {
+  run('npm', ['install', '--workspaces', '--include-workspace-root', '--include=dev'], workspaceRoot)
+}
+
 if (!shouldBuild) {
   process.exit(0)
 }
@@ -38,11 +58,11 @@ if (!existsSync(frontendPackageJson)) {
   process.exit(0)
 }
 
-if (!existsSync(path.join(frontendDistDir, 'index.html'))) {
-  if (!existsSync(workspaceNodeModules)) {
-    run('npm', ['install', '--workspaces', '--include-workspace-root'], workspaceRoot)
-  }
+if (!existsSync(workspaceNodeModules) || !hasFrontendBuildTooling()) {
+  installWorkspaceDependencies()
+}
 
+if (!existsSync(path.join(frontendDistDir, 'index.html'))) {
   run('npm', ['--workspace', 'frontend', 'run', 'build'], workspaceRoot)
 }
 
