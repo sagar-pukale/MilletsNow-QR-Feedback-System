@@ -1,9 +1,26 @@
-import { useEffect, useMemo, useState } from 'react'
-import { DownloadIcon, MessageSquareIcon, QrCodeIcon, StarIcon } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  DownloadIcon,
+  MessageSquareIcon,
+  PencilIcon,
+  QrCodeIcon,
+  StarIcon,
+  Trash2Icon,
+} from 'lucide-react'
 import { useLocation } from 'react-router-dom'
+import { FeedbackAlert } from '@/components/common/feedback-alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { EmptyState } from '@/components/common/empty-state'
+import { Input } from '@/components/ui/input'
 import {
   PageContainer,
   PageDescription,
@@ -12,6 +29,7 @@ import {
   PageLayout,
   PageTitle,
 } from '@/components/layout/page-layout'
+import { Textarea } from '@/components/ui/textarea'
 import { apiFetch } from '@/lib/api'
 
 type Message = {
@@ -54,7 +72,19 @@ type FeedbackSummary = {
   }>
 }
 
+type FeedbackResponse = {
+  items: Message[]
+  summary: FeedbackSummary
+}
+
 type ActiveMetric = 'all' | 'total' | 'average' | 'rated' | 'common_qr'
+type StatusTone = 'success' | 'destructive'
+type EditState = {
+  open: boolean
+  item: Message | null
+  message: string
+  rating: string
+}
 
 function normalizedFeedbackText(value: string | null) {
   const text = value?.trim()
@@ -89,67 +119,90 @@ function messageAuthorLabel(item: Message) {
   return item.name?.trim() || item.email?.trim() || `Feedback ${item.id.slice(0, 8)}`
 }
 
+const initialSummary: FeedbackSummary = {
+  total: 0,
+  totalRatings: 0,
+  commonQrTotal: 0,
+  withLocation: 0,
+  withoutLocation: 0,
+  todayTotal: 0,
+  averageRating: null,
+  ratingDistribution: [5, 4, 3, 2, 1].map((rating) => ({ rating, count: 0 })),
+}
+
+const initialEditState: EditState = {
+  open: false,
+  item: null,
+  message: '',
+  rating: '',
+}
+
 function MessagesPage() {
   const location = useLocation()
+  const isMountedRef = useRef(true)
+  const activeRequestRef = useRef(0)
   const [items, setItems] = useState<Message[]>([])
-  const [summary, setSummary] = useState<FeedbackSummary>({
-    total: 0,
-    totalRatings: 0,
-    commonQrTotal: 0,
-    withLocation: 0,
-    withoutLocation: 0,
-    todayTotal: 0,
-    averageRating: null,
-    ratingDistribution: [5, 4, 3, 2, 1].map((rating) => ({ rating, count: 0 })),
-  })
+  const [summary, setSummary] = useState<FeedbackSummary>(initialSummary)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeMetric, setActiveMetric] = useState<ActiveMetric>('all')
   const [exportBusy, setExportBusy] = useState(false)
+  const [editState, setEditState] = useState<EditState>(initialEditState)
+  const [saveBusy, setSaveBusy] = useState(false)
+  const [deleteBusyId, setDeleteBusyId] = useState<string | null>(null)
+  const [statusMessage, setStatusMessage] = useState<{ tone: StatusTone; text: string } | null>(null)
+
+  const loadFeedback = async (mode: 'initial' | 'refresh' = 'refresh') => {
+    const requestId = activeRequestRef.current + 1
+    activeRequestRef.current = requestId
+
+    if (mode === 'initial') setLoading(true)
+
+    try {
+      const response = await apiFetch(`/feedback?limit=1000&_=${Date.now()}`)
+      if (!response.ok) {
+        throw new Error(
+          response.status === 401
+            ? 'Your session has expired. Please sign in again.'
+            : 'Unable to load feedback.',
+        )
+      }
+
+      const body = (await response.json()) as FeedbackResponse
+      if (!isMountedRef.current || activeRequestRef.current !== requestId) return
+
+      setItems(body.items)
+      setSummary(body.summary)
+      setError('')
+    } catch (reason: unknown) {
+      if (!isMountedRef.current || activeRequestRef.current !== requestId) return
+      setError(reason instanceof Error ? reason.message : 'Unable to load feedback.')
+    } finally {
+      if (!isMountedRef.current || activeRequestRef.current !== requestId) return
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    let active = true
-
-    const fetchFeedback = async () => {
-      try {
-        const response = await apiFetch(`/feedback?limit=1000&_=${Date.now()}`)
-        if (!response.ok) {
-          throw new Error(
-            response.status === 401
-              ? 'Your session has expired. Please sign in again.'
-              : 'Unable to load feedback.',
-          )
-        }
-
-        const body = (await response.json()) as { items: Message[]; summary: FeedbackSummary }
-        if (active) {
-          setItems(body.items)
-          setSummary(body.summary)
-          setError('')
-        }
-      } catch (reason: unknown) {
-        if (active) setError(reason instanceof Error ? reason.message : 'Unable to load feedback.')
-      } finally {
-        if (active) setLoading(false)
-      }
-    }
+    isMountedRef.current = true
 
     const refreshIfVisible = () => {
       if (document.visibilityState === 'visible') {
-        void fetchFeedback()
+        void loadFeedback('refresh')
       }
     }
 
-    void fetchFeedback()
+    void loadFeedback('initial')
     const refreshTimer = window.setInterval(() => {
-      void fetchFeedback()
+      void loadFeedback('refresh')
     }, 30000)
 
     window.addEventListener('focus', refreshIfVisible)
     document.addEventListener('visibilitychange', refreshIfVisible)
 
     return () => {
-      active = false
+      isMountedRef.current = false
+      activeRequestRef.current += 1
       window.clearInterval(refreshTimer)
       window.removeEventListener('focus', refreshIfVisible)
       document.removeEventListener('visibilitychange', refreshIfVisible)
@@ -182,6 +235,21 @@ function MessagesPage() {
     return 'Show All'
   }, [activeMetric])
 
+  const openEditModal = (item: Message) => {
+    setStatusMessage(null)
+    setEditState({
+      open: true,
+      item,
+      message: item.message ?? '',
+      rating: item.rating != null ? String(item.rating) : '',
+    })
+  }
+
+  const closeEditModal = () => {
+    if (saveBusy) return
+    setEditState(initialEditState)
+  }
+
   const downloadExcel = async () => {
     if (summary.total === 0) {
       setError('No feedback records available to export.')
@@ -190,6 +258,7 @@ function MessagesPage() {
 
     setExportBusy(true)
     setError('')
+    setStatusMessage(null)
 
     try {
       const response = await apiFetch('/feedback/export.xlsx')
@@ -220,6 +289,87 @@ function MessagesPage() {
     }
   }
 
+  const saveEdit = async () => {
+    if (!editState.item) return
+
+    const nextMessage = editState.message.trim()
+    const payload: { message?: string | null; rating?: number } = {}
+
+    if (nextMessage !== (editState.item.message ?? '').trim()) {
+      payload.message = nextMessage.length ? nextMessage : null
+    }
+
+    if (editState.item.rating != null) {
+      const parsedRating = Number(editState.rating)
+      if (!Number.isInteger(parsedRating) || parsedRating < 1 || parsedRating > 5) {
+        setError('Rating must be a whole number between 1 and 5.')
+        return
+      }
+
+      if (parsedRating !== editState.item.rating) {
+        payload.rating = parsedRating
+      }
+    }
+
+    if (payload.message === undefined && payload.rating === undefined) {
+      setStatusMessage({ tone: 'success', text: 'No feedback changes were needed.' })
+      closeEditModal()
+      return
+    }
+
+    setSaveBusy(true)
+    setError('')
+    setStatusMessage(null)
+
+    try {
+      const response = await apiFetch(`/feedback/${editState.item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error ?? 'Unable to save feedback changes.')
+      }
+
+      await loadFeedback('refresh')
+      setStatusMessage({ tone: 'success', text: `Feedback ${editState.item.id.slice(0, 8)} was updated.` })
+      setEditState(initialEditState)
+    } catch (reason: unknown) {
+      setError(reason instanceof Error ? reason.message : 'Unable to save feedback changes.')
+    } finally {
+      setSaveBusy(false)
+    }
+  }
+
+  const deleteFeedback = async (item: Message) => {
+    const confirmed = window.confirm('Are you sure you want to delete this feedback?')
+    if (!confirmed) return
+
+    setDeleteBusyId(item.id)
+    setError('')
+    setStatusMessage(null)
+
+    try {
+      const response = await apiFetch(`/feedback/${item.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error ?? 'Unable to delete feedback.')
+      }
+
+      await loadFeedback('refresh')
+      setStatusMessage({ tone: 'success', text: `Feedback ${item.id.slice(0, 8)} was deleted.` })
+    } catch (reason: unknown) {
+      setError(reason instanceof Error ? reason.message : 'Unable to delete feedback.')
+    } finally {
+      setDeleteBusyId(null)
+    }
+  }
+
   return (
     <PageLayout className="bg-[linear-gradient(180deg,#eef8fb_0%,#f8fdfe_34%,#f6fbfd_100%)]">
       <PageContainer>
@@ -237,6 +387,14 @@ function MessagesPage() {
               {exportBusy ? 'Preparing Excel...' : 'Download Excel'}
             </Button>
           </PageHeader>
+
+          {statusMessage ? (
+            <FeedbackAlert tone={statusMessage.tone} title={statusMessage.text} />
+          ) : null}
+
+          {error ? (
+            <FeedbackAlert tone="destructive" title={error} />
+          ) : null}
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {metrics.map(([metric, label, value, Icon]) => {
@@ -331,7 +489,7 @@ function MessagesPage() {
             <Card className="border-[#d8ebf0] bg-white shadow-[0_18px_40px_rgba(18,74,88,0.06)]">
               <CardContent className="p-8 text-center text-sm text-[#6a8088]">Loading feedback...</CardContent>
             </Card>
-          ) : error ? (
+          ) : error && filteredItems.length === 0 ? (
             <Card className="border-red-200 bg-white">
               <CardContent className="p-8 text-center text-sm text-destructive">{error}</CardContent>
             </Card>
@@ -380,26 +538,26 @@ function MessagesPage() {
                   ].filter(Boolean)
                   const mapHref = mapLocationHref(item)
                   const locationLabel = preferredLocationLabel(item)
-                  const deviceLabel = [item.browser, item.deviceType, item.operatingSystem].filter(Boolean).join(' · ')
+                  const deviceLabel = [item.browser, item.deviceType, item.operatingSystem].filter(Boolean).join(' | ')
 
                   return (
                     <div
                       key={item.id}
-                      className="flex flex-col gap-2 p-5 sm:flex-row sm:items-start sm:justify-between"
+                      className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between"
                     >
                       <div className="max-w-4xl">
                         <p className="text-sm font-semibold text-[#20323a]">{authorLabel}</p>
-                        {(item.name && item.email) ? (
+                        {item.name && item.email ? (
                           <p className="mt-1 text-xs font-medium text-[#425861]">{item.email}</p>
                         ) : null}
                         {!showTextOnly && metaParts.length > 0 ? (
-                          <p className="mt-1 text-xs text-[#6c8189]">{metaParts.join(' · ')}</p>
+                          <p className="mt-1 text-xs text-[#6c8189]">{metaParts.join(' | ')}</p>
                         ) : null}
                         <div className="mt-3 rounded-[1rem] border border-[#dcecf0] bg-[#f9fdfe] px-4 py-3">
                           <p className="text-[11px] font-bold tracking-[0.14em] text-[#688089] uppercase">Feedback</p>
                           <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#20323a]">{message}</p>
                         </div>
-                        {(locationLabel || item.latitude != null || item.longitude != null || item.locationAccuracy != null || deviceLabel || mapHref) ? (
+                        {locationLabel || item.latitude != null || item.longitude != null || item.locationAccuracy != null || deviceLabel || mapHref ? (
                           <div className="mt-2 space-y-1 text-xs text-[#6c8189]">
                             {locationLabel ? <p>Location: {locationLabel}</p> : null}
                             {item.locationAccuracy != null ? <p>Accuracy: {Math.round(item.locationAccuracy)} m</p> : null}
@@ -424,11 +582,29 @@ function MessagesPage() {
                           </div>
                         ) : null}
                       </div>
-                      {showTypeBadge ? (
-                        <span className="rounded-full bg-[#edf8fb] px-2.5 py-1 text-xs font-semibold capitalize text-[#2e9bb8]">
-                          {item.type.replace('_', ' ')}
-                        </span>
-                      ) : null}
+                      <div className="flex flex-col items-start gap-3 sm:items-end">
+                        {showTypeBadge ? (
+                          <span className="rounded-full bg-[#edf8fb] px-2.5 py-1 text-xs font-semibold capitalize text-[#2e9bb8]">
+                            {item.type.replace('_', ' ')}
+                          </span>
+                        ) : null}
+                        <div className="flex flex-wrap gap-2">
+                          <Button type="button" variant="outline" size="sm" onClick={() => openEditModal(item)}>
+                            <PencilIcon className="size-3.5" />
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            disabled={deleteBusyId === item.id}
+                            onClick={() => void deleteFeedback(item)}
+                          >
+                            <Trash2Icon className="size-3.5" />
+                            {deleteBusyId === item.id ? 'Deleting...' : 'Delete'}
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   )
                 })}
@@ -437,6 +613,60 @@ function MessagesPage() {
           )}
         </div>
       </PageContainer>
+
+      <Dialog open={editState.open} onOpenChange={(open) => (!open ? closeEditModal() : undefined)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Feedback</DialogTitle>
+            <DialogDescription>
+              Update the existing feedback record. Saving will update the same database ID.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="feedback-message" className="text-sm font-semibold text-[#20323a]">
+                Feedback text
+              </label>
+              <Textarea
+                id="feedback-message"
+                value={editState.message}
+                onChange={(event) => setEditState((current) => ({ ...current, message: event.target.value }))}
+                placeholder="Enter feedback text"
+                rows={6}
+                disabled={saveBusy}
+              />
+            </div>
+
+            {editState.item?.rating != null ? (
+              <div className="space-y-2">
+                <label htmlFor="feedback-rating" className="text-sm font-semibold text-[#20323a]">
+                  Rating
+                </label>
+                <Input
+                  id="feedback-rating"
+                  type="number"
+                  min={1}
+                  max={5}
+                  step={1}
+                  value={editState.rating}
+                  onChange={(event) => setEditState((current) => ({ ...current, rating: event.target.value }))}
+                  disabled={saveBusy}
+                />
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeEditModal} disabled={saveBusy}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void saveEdit()} disabled={saveBusy}>
+              {saveBusy ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageLayout>
   )
 }

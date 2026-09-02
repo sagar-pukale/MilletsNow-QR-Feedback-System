@@ -4,8 +4,9 @@ import multer from 'multer'
 import { createHash } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import XLSX from 'xlsx'
+import { z } from 'zod'
 import { prisma } from '../config/prisma.js'
-import { attachOptionalAuth, requireAuth, type AuthRequest } from '../middleware/auth.js'
+import { attachOptionalAuth, requireAdmin, requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { FeedbackImageError, uploadFeedbackImage } from '../services/feedback-image-service.js'
 import { reverseGeocodeFeedbackLocation } from '../services/feedback-location-service.js'
 import { parseUserAgent, sanitizeAccuracy, sanitizeCoordinate } from '../services/feedback-submission-metadata-service.js'
@@ -26,6 +27,18 @@ const upload = multer({
 })
 const duplicateSubmissionWindowMs = 10_000
 const duplicateSubmissionCache = new Map<string, { feedbackId: string; status: string; expiresAt: number }>()
+const feedbackAdminUpdateSchema = z
+  .object({
+    rating: z.coerce.number().int().min(1).max(5).optional(),
+    message: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => (value == null ? undefined : value.length ? value : null)),
+  })
+  .refine((value) => value.rating !== undefined || value.message !== undefined, {
+    message: 'At least one editable field is required.',
+  })
 
 type FeedbackWithProduct = Prisma.FeedbackGetPayload<{
   include: {
@@ -267,6 +280,117 @@ feedbackRoutes.get('/', requireAuth, async (request, response, next) => {
       },
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     })
+  } catch (error) {
+    next(error)
+  }
+})
+
+feedbackRoutes.patch('/:id', requireAdmin, async (request, response, next) => {
+  try {
+    disableAdminApiCaching(response)
+
+    const feedbackId = String(request.params.id ?? '').trim()
+    if (!feedbackId) {
+      return response.status(400).json({ error: 'Feedback ID is required.' })
+    }
+
+    const input = feedbackAdminUpdateSchema.parse(request.body)
+    const existing = await prisma.feedback.findUnique({
+      where: { id: feedbackId },
+      select: {
+        id: true,
+        rating: true,
+        message: true,
+        question: { select: { id: true } },
+        compliment: { select: { id: true } },
+      },
+    })
+
+    if (!existing) {
+      return response.status(404).json({ error: 'Feedback record not found.' })
+    }
+
+    if (input.rating !== undefined && existing.rating == null) {
+      return response.status(400).json({ error: 'This feedback record does not have a rating to edit.' })
+    }
+
+    const nextMessage = input.message ?? existing.message ?? null
+    if ((existing.question || existing.compliment) && nextMessage == null) {
+      return response.status(400).json({ error: 'Feedback text cannot be empty for this record.' })
+    }
+
+    const updated = await prisma.$transaction(async (transaction) => {
+      const feedback = await transaction.feedback.update({
+        where: { id: feedbackId },
+        data: {
+          ...(input.rating !== undefined ? { rating: input.rating } : {}),
+          ...(input.message !== undefined ? { message: input.message ?? null } : {}),
+          lastActionAt: new Date(),
+        },
+        select: {
+          id: true,
+          rating: true,
+          message: true,
+          updatedAt: true,
+        },
+      })
+
+      if (input.message !== undefined && nextMessage != null) {
+        if (existing.question) {
+          await transaction.question.update({
+            where: { feedbackId },
+            data: { question: nextMessage },
+          })
+        }
+
+        if (existing.compliment) {
+          await transaction.compliment.update({
+            where: { feedbackId },
+            data: { message: nextMessage },
+          })
+        }
+      }
+
+      return feedback
+    })
+
+    response.json({
+      success: true,
+      item: {
+        id: updated.id,
+        rating: updated.rating,
+        message: updated.message,
+        updatedAt: updated.updatedAt,
+      },
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
+feedbackRoutes.delete('/:id', requireAdmin, async (request, response, next) => {
+  try {
+    disableAdminApiCaching(response)
+
+    const feedbackId = String(request.params.id ?? '').trim()
+    if (!feedbackId) {
+      return response.status(400).json({ error: 'Feedback ID is required.' })
+    }
+
+    const existing = await prisma.feedback.findUnique({
+      where: { id: feedbackId },
+      select: { id: true },
+    })
+
+    if (!existing) {
+      return response.status(404).json({ error: 'Feedback record not found.' })
+    }
+
+    await prisma.feedback.delete({
+      where: { id: feedbackId },
+    })
+
+    response.json({ success: true, id: feedbackId })
   } catch (error) {
     next(error)
   }

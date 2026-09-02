@@ -30,6 +30,27 @@ export async function requireAuth(request: AuthRequest, response: Response, next
   next()
 }
 
+export async function requireAdmin(request: AuthRequest, response: Response, next: NextFunction) {
+  const user = await resolveAuthenticatedUser(request)
+  if (!user) {
+    logger.info('Authentication required', {
+      method: request.method,
+      path: request.originalUrl,
+      origin: request.headers.origin ?? null,
+      hasAuthorization: Boolean(request.headers.authorization),
+      hasCookie: Boolean(request.headers.cookie),
+    })
+    return response.status(401).json({ error: 'Authentication required' })
+  }
+
+  if (!['owner', 'admin'].includes(user.role)) {
+    return response.status(403).json({ error: 'Admin access required' })
+  }
+
+  request.user = user
+  next()
+}
+
 export async function attachOptionalAuth(request: AuthRequest, _response: Response, next: NextFunction) {
   request.user = (await resolveAuthenticatedUser(request)) ?? undefined
   next()
