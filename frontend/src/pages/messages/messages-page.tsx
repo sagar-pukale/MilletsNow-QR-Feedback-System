@@ -123,6 +123,10 @@ function messageAuthorLabel(item: Message) {
   return item.name?.trim() || item.email?.trim() || `Feedback ${item.id.slice(0, 8)}`
 }
 
+function displayedEmail(item: Message) {
+  return item.email?.trim() || null
+}
+
 const initialSummary: FeedbackSummary = {
   total: 0,
   totalRatings: 0,
@@ -572,6 +576,7 @@ function MessagesPage() {
                   const mapHref = mapLocationHref(item)
                   const locationLabel = preferredLocationLabel(item)
                   const deviceLabel = [item.browser, item.deviceType, item.operatingSystem].filter(Boolean).join(' | ')
+                  const emailLabel = displayedEmail(item)
 
                   return (
                     <div
@@ -580,9 +585,7 @@ function MessagesPage() {
                     >
                       <div className="max-w-4xl">
                         <p className="text-sm font-semibold text-[#20323a]">{authorLabel}</p>
-                        {item.name && item.email ? (
-                          <p className="mt-1 text-xs font-medium text-[#425861]">{item.email}</p>
-                        ) : null}
+                        {emailLabel ? <p className="mt-1 text-xs font-medium text-[#425861]">Email ID: {emailLabel}</p> : null}
                         {!showTextOnly && metaParts.length > 0 ? (
                           <p className="mt-1 text-xs text-[#6c8189]">{metaParts.join(' | ')}</p>
                         ) : null}

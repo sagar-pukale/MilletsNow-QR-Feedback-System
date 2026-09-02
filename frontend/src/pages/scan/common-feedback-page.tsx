@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import milletsNowLogo from '@/assets/Milletslogo.jpeg'
 import milletsProductsImage from '@/assets/products/millets-products.png'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { socialLinks } from '@/constants/social-links'
 import { apiPath } from '@/lib/api'
@@ -11,7 +12,7 @@ import { collectFeedbackLocation } from '@/lib/feedback-submission-metadata'
 import { cn } from '@/lib/utils'
 import { CustomerPageShell } from './scan-shared'
 
-type Errors = Partial<Record<'rating' | 'message' | 'form', string>>
+type Errors = Partial<Record<'rating' | 'message' | 'email' | 'form', string>>
 
 const milletsNowCollectionUrl = 'https://milletsnow.com/collections/all'
 const accentCyan = '#2E9BB8'
@@ -20,6 +21,7 @@ const accentCyanSoft = '#E8F7FB'
 function CommonFeedbackPage() {
   const navigate = useNavigate()
   const [rating, setRating] = useState(0)
+  const [email, setEmail] = useState('')
   const [message, setMessage] = useState('')
   const [errors, setErrors] = useState<Errors>({})
   const [submitting, setSubmitting] = useState(false)
@@ -27,7 +29,13 @@ function CommonFeedbackPage() {
 
   const submit = async () => {
     const nextErrors: Errors = {}
+    const normalizedEmail = email.trim()
     if (!rating) nextErrors.rating = 'Please select a rating.'
+    if (!normalizedEmail) {
+      nextErrors.email = 'Please enter your email ID.'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      nextErrors.email = 'Please enter a valid email ID.'
+    }
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length) return
 
@@ -48,6 +56,7 @@ function CommonFeedbackPage() {
         body: JSON.stringify({
           type: 'feedback',
           source: 'common_qr',
+          email: normalizedEmail,
           rating,
           message: message.trim() || undefined,
           ...location.payload,
@@ -117,6 +126,21 @@ function CommonFeedbackPage() {
               ))}
             </div>
             {errors.rating ? <p className="mt-3 text-center text-sm text-destructive">{errors.rating}</p> : null}
+
+            <div className="mt-4 sm:mt-6">
+              <label className="block text-sm font-semibold text-[#223038]">
+                Email ID
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  className="mt-2 rounded-[1rem] border-[#d8ecf2] bg-white px-3 py-2.5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] sm:mt-3 sm:rounded-[1.25rem] sm:px-3.5 sm:py-3"
+                  placeholder="Enter your email address"
+                  aria-invalid={Boolean(errors.email)}
+                />
+              </label>
+              {errors.email ? <p className="mt-3 text-sm text-destructive">{errors.email}</p> : null}
+            </div>
 
             <div className="mt-4 sm:mt-6">
               <label className="block text-sm font-semibold text-[#223038]">

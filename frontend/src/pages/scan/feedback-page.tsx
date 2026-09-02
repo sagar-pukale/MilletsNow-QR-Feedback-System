@@ -3,13 +3,14 @@ import type { ReactNode } from 'react'
 import { ArrowLeftIcon, ImagePlusIcon, LoaderCircleIcon, StarIcon, TriangleAlertIcon } from 'lucide-react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { apiPath } from '@/lib/api'
 import { collectFeedbackLocation } from '@/lib/feedback-submission-metadata'
 import { BrandHeader, CustomerPageShell, FollowUs, ProductHero, resolveAssetUrl, type ScanPayload } from './scan-shared'
 
 type FlowType = 'feedback' | 'complaint' | 'compliment'
-type Errors = Partial<Record<'rating' | 'quality' | 'message' | 'category' | 'form', string>>
+type Errors = Partial<Record<'rating' | 'quality' | 'message' | 'category' | 'email' | 'form', string>>
 
 const qualityOptions = ['Excellent', 'Good', 'Average', 'Poor'] as const
 const complaintCategories = ['Product Quality', 'Packaging', 'Delivery', 'Other'] as const
@@ -29,6 +30,7 @@ function FeedbackPage() {
   const [rating, setRating] = useState(0)
   const [quality, setQuality] = useState('')
   const [category, setCategory] = useState('')
+  const [email, setEmail] = useState('')
   const [message, setMessage] = useState('')
   const [image, setImage] = useState<File | null>(null)
   const [errors, setErrors] = useState<Errors>({})
@@ -78,9 +80,16 @@ function FeedbackPage() {
 
   const validate = () => {
     const nextErrors: Errors = {}
+    const normalizedEmail = email.trim()
 
     if ((submissionType === 'feedback' || submissionType === 'compliment') && !rating) {
       nextErrors.rating = 'Please select a rating.'
+    }
+
+    if (!normalizedEmail) {
+      nextErrors.email = 'Please enter your email ID.'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      nextErrors.email = 'Please enter a valid email ID.'
     }
 
     if (submissionType === 'feedback' && !quality) {
@@ -105,6 +114,7 @@ function FeedbackPage() {
     const body = new FormData()
     body.append('type', submissionType)
     body.append('qrToken', qrToken)
+    body.append('email', email.trim())
     if (rating) body.append('rating', String(rating))
     if (quality) body.append('quality', quality)
     if (category) body.append('category', category)
@@ -273,6 +283,17 @@ function FeedbackPage() {
             aria-invalid={Boolean(errors.message)}
           />
           {errors.message ? <FieldError message={errors.message} /> : null}
+        </Field>
+
+        <Field label="Email ID">
+          <Input
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="Enter your email address"
+            aria-invalid={Boolean(errors.email)}
+          />
+          {errors.email ? <FieldError message={errors.email} /> : null}
         </Field>
 
         {(submissionType === 'feedback' || submissionType === 'complaint') ? (

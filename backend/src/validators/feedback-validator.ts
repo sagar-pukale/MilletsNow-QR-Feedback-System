@@ -21,7 +21,7 @@ export const feedbackSchema = z
     email: z
       .string()
       .trim()
-      .email()
+      .email('Enter a valid email address.')
       .optional()
       .or(z.literal('').transform(() => undefined)),
     latitude: optionalNumber,
@@ -55,6 +55,14 @@ export const feedbackSchema = z
         code: z.ZodIssueCode.custom,
         path: ['quality'],
         message: 'Taste / Quality selection is required.',
+      })
+    }
+
+    if (!value.email) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['email'],
+        message: 'Email ID is required.',
       })
     }
 

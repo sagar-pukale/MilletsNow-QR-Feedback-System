@@ -138,11 +138,18 @@ async function submitFeedback(request: UploadRequest, response: Response, next: 
       })
     }
 
+    const resolvedEmail = request.user?.email ?? input.email ?? null
+    if (!resolvedEmail) {
+      return response.status(400).json({
+        error: 'Validation failed',
+        details: { email: ['Email ID is required.'] },
+      })
+    }
+
     const imageUrl = await uploadFeedbackImage(request.file)
     const submittedAt = new Date()
     const userAgent = request.get('user-agent') ?? null
     const parsedUserAgent = parseUserAgent(userAgent)
-    const resolvedEmail = request.user?.email ?? input.email ?? null
     const resolvedName = (request.user?.fullName?.trim() || input.name) ?? null
     const latitude = sanitizeCoordinate(input.latitude)
     const longitude = sanitizeCoordinate(input.longitude)
@@ -410,6 +417,7 @@ feedbackRoutes.get('/export.xlsx', requireAuth, async (_request, response, next)
         'Feedback ID': item.id,
         Date: formatExcelDate(submittedAt),
         Time: formatExcelTime(submittedAt),
+        'Email ID': item.email ?? '',
         Rating: item.rating ?? '',
         Feedback: item.message ?? '',
         Location: exportLocationValue(item),
@@ -421,6 +429,7 @@ feedbackRoutes.get('/export.xlsx', requireAuth, async (_request, response, next)
       { wch: 38 },
       { wch: 14 },
       { wch: 14 },
+      { wch: 32 },
       { wch: 10 },
       { wch: 60 },
       { wch: 42 },
