@@ -85,6 +85,10 @@ type EditState = {
   message: string
   rating: string
 }
+type DeleteState = {
+  open: boolean
+  item: Message | null
+}
 
 function normalizedFeedbackText(value: string | null) {
   const text = value?.trim()
@@ -137,6 +141,23 @@ const initialEditState: EditState = {
   rating: '',
 }
 
+const initialDeleteState: DeleteState = {
+  open: false,
+  item: null,
+}
+
+async function readApiError(response: Response, fallback: string) {
+  const contentType = response.headers.get('content-type') ?? ''
+
+  if (contentType.includes('application/json')) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null
+    return body?.error ?? fallback
+  }
+
+  const text = (await response.text().catch(() => '')).trim()
+  return text || fallback
+}
+
 function MessagesPage() {
   const location = useLocation()
   const isMountedRef = useRef(true)
@@ -148,6 +169,7 @@ function MessagesPage() {
   const [activeMetric, setActiveMetric] = useState<ActiveMetric>('all')
   const [exportBusy, setExportBusy] = useState(false)
   const [editState, setEditState] = useState<EditState>(initialEditState)
+  const [deleteState, setDeleteState] = useState<DeleteState>(initialDeleteState)
   const [saveBusy, setSaveBusy] = useState(false)
   const [deleteBusyId, setDeleteBusyId] = useState<string | null>(null)
   const [statusMessage, setStatusMessage] = useState<{ tone: StatusTone; text: string } | null>(null)
@@ -263,8 +285,7 @@ function MessagesPage() {
     try {
       const response = await apiFetch('/feedback/export.xlsx')
       if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { error?: string } | null
-        throw new Error(body?.error ?? 'Unable to export feedback to Excel.')
+        throw new Error(await readApiError(response, 'Unable to export feedback to Excel.'))
       }
 
       const blob = await response.blob()
@@ -329,8 +350,7 @@ function MessagesPage() {
       })
 
       if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { error?: string } | null
-        throw new Error(body?.error ?? 'Unable to save feedback changes.')
+        throw new Error(await readApiError(response, 'Unable to save feedback changes.'))
       }
 
       await loadFeedback('refresh')
@@ -343,9 +363,22 @@ function MessagesPage() {
     }
   }
 
-  const deleteFeedback = async (item: Message) => {
-    const confirmed = window.confirm('Are you sure you want to delete this feedback?')
-    if (!confirmed) return
+  const openDeleteDialog = (item: Message) => {
+    setStatusMessage(null)
+    setDeleteState({
+      open: true,
+      item,
+    })
+  }
+
+  const closeDeleteDialog = () => {
+    if (deleteBusyId) return
+    setDeleteState(initialDeleteState)
+  }
+
+  const deleteFeedback = async () => {
+    const item = deleteState.item
+    if (!item) return
 
     setDeleteBusyId(item.id)
     setError('')
@@ -357,12 +390,12 @@ function MessagesPage() {
       })
 
       if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { error?: string } | null
-        throw new Error(body?.error ?? 'Unable to delete feedback.')
+        throw new Error(await readApiError(response, 'Unable to delete feedback.'))
       }
 
       await loadFeedback('refresh')
       setStatusMessage({ tone: 'success', text: `Feedback ${item.id.slice(0, 8)} was deleted.` })
+      setDeleteState(initialDeleteState)
     } catch (reason: unknown) {
       setError(reason instanceof Error ? reason.message : 'Unable to delete feedback.')
     } finally {
@@ -598,7 +631,7 @@ function MessagesPage() {
                             variant="destructive"
                             size="sm"
                             disabled={deleteBusyId === item.id}
-                            onClick={() => void deleteFeedback(item)}
+                            onClick={() => openDeleteDialog(item)}
                           >
                             <Trash2Icon className="size-3.5" />
                             {deleteBusyId === item.id ? 'Deleting...' : 'Delete'}
@@ -663,6 +696,37 @@ function MessagesPage() {
             </Button>
             <Button type="button" onClick={() => void saveEdit()} disabled={saveBusy}>
               {saveBusy ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteState.open} onOpenChange={(open) => (!open ? closeDeleteDialog() : undefined)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Feedback</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this feedback?
+            </DialogDescription>
+          </DialogHeader>
+
+          {deleteState.item ? (
+            <div className="rounded-[1rem] border border-[#dcecf0] bg-[#f9fdfe] px-4 py-3">
+              <p className="text-[11px] font-bold tracking-[0.14em] text-[#688089] uppercase">Selected record</p>
+              <p className="mt-2 text-sm font-semibold text-[#20323a]">{messageAuthorLabel(deleteState.item)}</p>
+              <p className="mt-1 text-xs text-[#6c8189]">ID: {deleteState.item.id}</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#20323a]">
+                {normalizedFeedbackText(deleteState.item.message) ?? 'No written feedback'}
+              </p>
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeDeleteDialog} disabled={Boolean(deleteBusyId)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={() => void deleteFeedback()} disabled={Boolean(deleteBusyId)}>
+              {deleteBusyId ? 'Deleting...' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>
